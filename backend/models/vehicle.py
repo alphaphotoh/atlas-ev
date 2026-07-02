@@ -1,32 +1,30 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 
 
 @dataclass
 class Vehicle:
 
-    # Basic Info
-    make: str
-    model: str
-    trim: str
-    year: int
+    name: str
 
-    # Battery
-    battery_capacity: float
-    usable_capacity: float
+    battery_capacity_kwh: float
 
-    # Charging
-    max_dc_charge_kw: float
-    max_ac_charge_kw: float
+    usable_battery_kwh: float
 
-    # Dimensions
-    wheel_size: int
+    default_efficiency: float
+
+    dc_max_kw: float
+
+    ac_max_kw: float
+
+    min_arrival_soc: float
+
+    optimal_charge_limit: float
+
+    # Vehicle physics
+    mass_kg: float
+
     drag_coefficient: float
-    frontal_area: float
-    curb_weight: float
 
-    # Efficiency
-    default_city_efficiency: float
-    default_highway_efficiency: float
+    frontal_area_m2: float
 
-    def to_dict(self):
-        return asdict(self)
+    rolling_resistance: float

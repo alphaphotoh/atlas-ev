@@ -1,4 +1,4 @@
-from backend.models.vf9 import VF9
+from backend.models.vehicles.vf9 import VF9
 from backend.services.energy import EnergyPredictor
 
 
