@@ -41,7 +41,7 @@ class DepartureSOCService:
 
             departure_soc,
 
-            planning.preferred_arrival_soc
+            planning.target_destination_soc
 
         )
 
@@ -49,11 +49,14 @@ class DepartureSOCService:
 
             departure_soc,
 
-            planning.maximum_departure_soc
+            planning.road_trip_charge_limit
 
         )
 
         return round(
+
             departure_soc,
+
             1
+
         )

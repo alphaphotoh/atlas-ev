@@ -1,30 +1,40 @@
 from backend.services.planning.candidate_builder import CandidateBuilder
-from backend.services.planning.candidate_selector import CandidateSelector
-from backend.services.planning.candidate_sorter import CandidateSorter
 from backend.services.planning.corridor_service import CorridorService
-from backend.services.planning.scoring_service import ScoringService
+from backend.services.planning.result_printer import ResultPrinter
 from backend.services.planning.search_window_service import SearchWindowService
+from backend.services.planning.optimizer.trip_optimizer import TripOptimizer
+from backend.services.planning.trip_simulator import TripSimulator
 
 
 class ChargingPlanner:
 
-    SEARCH_SOC = 25
-
     @staticmethod
     async def plan(trip):
+
+        minimum_soc = (
+            trip.planning.minimum_charger_arrival_soc
+        )
 
         search_state = None
 
         for state in trip.battery_states:
 
-            if state.soc <= ChargingPlanner.SEARCH_SOC:
+            if state.soc <= minimum_soc:
 
                 search_state = state
-
                 break
 
         if search_state is None:
+
+            print()
+
+            print(
+                "Trip can be completed without charging."
+            )
+
             return []
+
+        print()
 
         print(
             f"Battery reaches "
@@ -34,20 +44,31 @@ class ChargingPlanner:
         )
 
         window = SearchWindowService.build(
+
             trip.route,
+
             search_state
+
         )
 
         print(
+
             f"Search Window: "
+
             f"{window['start_distance']:.1f} km"
+
             f" -> "
+
             f"{window['end_distance']:.1f} km"
+
         )
 
         chargers = await CorridorService.find_chargers_in_window(
+
             trip.route,
+
             window
+
         )
 
         candidates = []
@@ -55,60 +76,50 @@ class ChargingPlanner:
         for charger in chargers:
 
             candidate = CandidateBuilder.build(
-                trip,
-                charger,
-                search_state
-            )
 
-            candidate.score = ScoringService.score(
-                candidate
+                trip,
+
+                charger,
+
+                search_state
+
             )
 
             candidates.append(candidate)
 
-        CandidateSorter.sort(candidates)
+        trip.results = []
 
-        best = CandidateSelector.best(
-            candidates,
-            limit=10
+        for candidate in candidates:
+
+            trip.results.append(
+
+                TripSimulator.simulate(
+                    trip,
+                    candidate
+                )
+
+            )
+
+        trip.results.sort(
+
+            key=lambda result:
+            result.total_trip_time_minutes
+
         )
 
-        print()
-        print("========== BEST CANDIDATES ==========")
 
-        for candidate in best:
+        best_results = TripOptimizer.optimize(
 
-            print()
+            trip.results,
 
-            print(candidate.charger.name)
+            limit=10
 
-            print(
-                f"Score: {candidate.score:.1f}"
-            )
+        )
 
-            print(
-                f"Arrival SOC: "
-                f"{candidate.arrival_soc:.1f}%"
-            )
+        ResultPrinter.print(
 
-            print(
-                f"Departure SOC: "
-                f"{candidate.departure_soc:.1f}%"
-            )
+            best_results
 
-            print(
-                f"Energy Added: "
-                f"{candidate.charge_added_kwh:.1f} kWh"
-            )
+        )
 
-            print(
-                f"Charging Time: "
-                f"{candidate.charging_time_minutes:.1f} min"
-            )
-
-            print(
-                f"Detour: "
-                f"{candidate.charger.detour_km:.2f} km"
-            )
-
-        return best
+        return best_results

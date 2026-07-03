@@ -77,13 +77,30 @@ class TripService:
             energy_used=energy_needed
         )
 
-        trip.metadata["predicted_efficiency"] = predicted_efficiency
-        trip.metadata["energy_needed_kwh"] = energy_needed
-        trip.metadata["arrival_soc"] = arrival_soc
+        from backend.models.simulation_context import SimulationContext
+
+        trip.simulation = SimulationContext(
+
+            predicted_efficiency=predicted_efficiency,
+
+            energy_needed_kwh=energy_needed,
+
+            arrival_soc=arrival_soc,
+
+            average_speed=average_speed,
+
+            temperature=temperature,
+
+            highway_ratio=highway_ratio
+
+        )
+
+        
 
         trip.recommended_chargers = await ChargingPlanner.plan(
             trip
         )
+        
 
         return {
             "vehicle": trip.vehicle.name,
@@ -92,16 +109,16 @@ class TripService:
             "distance_km": round(trip.route.distance_km, 1),
             "duration_minutes": round(trip.route.duration_minutes),
             "predicted_efficiency": round(
-                trip.metadata["predicted_efficiency"], 1
+                trip.simulation.predicted_efficiency, 1
             ),
             "energy_needed_kwh": round(
-                trip.metadata["energy_needed_kwh"], 1
+                trip.simulation.energy_needed_kwh, 1
             ),
             "estimated_arrival_soc": round(
-                trip.metadata["arrival_soc"], 1
+                trip.simulation.arrival_soc, 1
             ),
             "charging_required": (
-                trip.metadata["arrival_soc"]
+                trip.simulation.arrival_soc
                 < trip.vehicle.min_arrival_soc
             ),
             "charging_plan": trip.recommended_chargers

@@ -1,69 +1,86 @@
-from backend.models.charging_candidate import ChargingCandidate
+from backend.models.simulation_result import SimulationResult
 
-from backend.services.planning.departure_soc_service import (
-    DepartureSOCService,
-)
-from backend.services.planning.projection_service import (
-    ProjectionService,
-)
-from backend.services.simulation.charging_time_service import (
-    ChargingTimeService,
-)
+from backend.services.simulation.models.energy_model import EnergyModel
+from backend.services.simulation.models.battery_model import BatteryModel
 
 
-class CandidateBuilder:
+class TripSimulator:
+
+    DETOUR_SPEED_KMH = 50
 
     @staticmethod
-    def build(
+    def simulate(
         trip,
-        charger,
-        search_state
+        candidate
     ):
 
-        projected = ProjectionService.project(
-            trip.route,
-            charger
-        )
-
         remaining_distance = (
-            trip.route.distance_km
-            - projected.route_distance_km
+            trip.route.distance_km -
+            candidate.charger.route_distance_km
         )
 
-        departure_soc = DepartureSOCService.calculate(
+        energy_used = EnergyModel.energy_used(
+            remaining_distance,
+            trip.simulation.predicted_efficiency
+        )
+
+        destination_soc = BatteryModel.destination_soc(
             vehicle=trip.vehicle,
-            remaining_distance_km=remaining_distance,
-            efficiency=trip.metadata[
-                "predicted_efficiency"
-            ],
-            planning=trip.planning
+            departure_soc=candidate.departure_soc,
+            energy_used=energy_used
         )
 
-        energy_added, charging_time = (
-            ChargingTimeService.estimate(
-                vehicle=trip.vehicle,
-                arrival_soc=search_state.soc,
-                target_soc=departure_soc
-            )
+        if trip.simulation.average_speed <= 0:
+            driving_time = 0
+        else:
+            driving_time = (
+                remaining_distance /
+                trip.simulation.average_speed
+            ) * 60
+
+        detour_time = (
+            candidate.charger.detour_km /
+            TripSimulator.DETOUR_SPEED_KMH
+        ) * 60
+
+        total_trip_time = (
+            driving_time +
+            detour_time +
+            candidate.charging_time_minutes
         )
 
-        return ChargingCandidate(
+        return SimulationResult(
 
-            charger=projected,
+            candidate=candidate,
 
-            arrival_soc=search_state.soc,
-
-            departure_soc=departure_soc,
-
-            charge_added_kwh=energy_added,
-
-            charging_time_minutes=charging_time,
-
-            total_trip_time_minutes=(
-                trip.route.duration_minutes
-                + charging_time
+            destination_soc=round(
+                destination_soc,
+                1
             ),
 
-            score=0.0
+            energy_used_kwh=round(
+                energy_used,
+                1
+            ),
+
+            charging_time_minutes=round(
+                candidate.charging_time_minutes,
+                1
+            ),
+
+            driving_time_minutes=round(
+                driving_time,
+                1
+            ),
+
+            detour_time_minutes=round(
+                detour_time,
+                1
+            ),
+
+            total_trip_time_minutes=round(
+                total_trip_time,
+                1
+            )
 
         )

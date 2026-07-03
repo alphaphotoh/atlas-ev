@@ -2,8 +2,11 @@ from dataclasses import dataclass, field
 
 from backend.models.vehicle import Vehicle
 from backend.models.route import Route
-from backend.models.battery_state import BatteryState
 from backend.models.trip_planning_config import TripPlanningConfig
+from backend.models.simulation_context import SimulationContext
+from backend.models.battery_state import BatteryState
+from backend.models.charging_candidate import ChargingCandidate
+from backend.models.simulation_result import SimulationResult
 
 
 @dataclass
@@ -17,22 +20,16 @@ class TripPlan:
         default_factory=TripPlanningConfig
     )
 
+    simulation: SimulationContext | None = None
+
     battery_states: list[BatteryState] = field(
         default_factory=list
     )
 
-    projected_chargers: list = field(
+    recommended_chargers: list[ChargingCandidate] = field(
         default_factory=list
     )
 
-    recommended_chargers: list = field(
+    results: list[SimulationResult] = field(
         default_factory=list
-    )
-
-    results: list = field(
-        default_factory=list
-    )
-
-    metadata: dict = field(
-        default_factory=dict
     )
