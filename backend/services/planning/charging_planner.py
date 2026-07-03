@@ -1,5 +1,6 @@
 from backend.models.charging_candidate import ChargingCandidate
 from backend.services.corridor_service import CorridorService
+from backend.services.projection_service import ProjectionService
 from backend.services.search_window_service import SearchWindowService
 
 
@@ -22,8 +23,10 @@ class ChargingPlanner:
             return []
 
         print(
-            f"Battery reaches {search_state.soc:.1f}% "
-            f"at {search_state.distance_km:.1f} km"
+            f"Battery reaches "
+            f"{search_state.soc:.1f}% "
+            f"at "
+            f"{search_state.distance_km:.1f} km"
         )
 
         window = SearchWindowService.build(
@@ -33,8 +36,9 @@ class ChargingPlanner:
 
         print(
             f"Search Window: "
-            f"{window.start_distance_km:.1f} km -> "
-            f"{window.end_distance_km:.1f} km"
+            f"{window['start_distance']:.1f} km"
+            f" -> "
+            f"{window['end_distance']:.1f} km"
         )
 
         chargers = await CorridorService.find_chargers_in_window(
@@ -44,7 +48,22 @@ class ChargingPlanner:
 
         candidates = []
 
+        print()
+        print("Projected Chargers")
+        print("------------------")
+
         for charger in chargers:
+
+            charger = ProjectionService.project(
+                route,
+                charger
+            )
+
+            print(
+                f"{charger.name}"
+                f" | Route {charger.route_distance_km:.1f} km"
+                f" | Detour {charger.detour_km:.2f} km"
+            )
 
             candidates.append(
 

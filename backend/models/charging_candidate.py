@@ -1,17 +1,21 @@
 from dataclasses import dataclass
 
-from backend.models.charger import Charger
+from backend.models.projected_charger import ProjectedCharger
 
 
 @dataclass
 class ChargingCandidate:
 
-    charger: Charger
+    charger: ProjectedCharger
 
     arrival_soc: float
 
-    departure_soc: float = 0
+    departure_soc: float
 
-    charging_minutes: float = 0
+    charge_added_kwh: float
 
-    score: float = 0
+    charging_time_minutes: float
+
+    total_trip_time_minutes: float
+
+    score: float

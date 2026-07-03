@@ -27,3 +27,9 @@ class Charger:
     supports_vf9: bool = False
 
     score: int = 0
+
+    route_distance_km: float | None = None
+
+    nearest_segment: int | None = None
+
+    detour_km: float | None = None
