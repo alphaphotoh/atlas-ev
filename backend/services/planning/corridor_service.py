@@ -1,8 +1,7 @@
 import math
 
-from backend.services.charger_service import ChargerService
-from backend.services.scoring_service import ScoringService
-from backend.services.search_window_service import SearchWindowService
+from backend.services.adapters.charger_service import ChargerService
+from backend.services.planning.search_window_service import SearchWindowService
 from backend.utils.async_utils import AsyncUtils
 
 
@@ -119,25 +118,16 @@ class CorridorService:
 
             for charger in chargers:
 
-                charger_id = charger.id
-
                 if charger.id is None:
                     continue
 
-                if charger_id not in unique_chargers:
+                if charger.id not in unique_chargers:
+                    unique_chargers[charger.id] = charger
 
-                    unique_chargers[charger_id] = (
-                        ScoringService.score(charger)
-                    )
-
-        ranked = sorted(
-            unique_chargers.values(),
-            key=lambda charger: charger.score,
-            reverse=True
-        )
+        chargers = list(unique_chargers.values())
 
         print(
-            f"Window chargers: {len(ranked)}"
+            f"Window chargers: {len(chargers)}"
         )
 
-        return ranked
+        return chargers

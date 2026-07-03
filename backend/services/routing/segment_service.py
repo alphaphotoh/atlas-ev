@@ -1,5 +1,5 @@
 from backend.models.route_segment import RouteSegment
-from backend.services.corridor_service import CorridorService
+from backend.services.planning.corridor_service import CorridorService
 
 
 class SegmentService:

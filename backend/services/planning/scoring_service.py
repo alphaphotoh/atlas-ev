@@ -1,41 +1,26 @@
 class ScoringService:
 
     @staticmethod
-    def score(charger):
+    def score(candidate):
 
-        score = 0
+        score = 1000
 
-        if charger.supports_vf9:
-            score += 100
+        # Prefer shorter charging sessions
+        score -= candidate.charging_time_minutes * 6
 
-        power = charger.power_kw or 0
+        # Prefer smaller detours
+        score -= candidate.charger.detour_km * 20
 
-        if power >= 250:
-            score += 50
+        # Prefer higher charger power
+        if candidate.charger.power_kw:
+            score += min(
+                candidate.charger.power_kw,
+                350
+            ) / 2
 
-        elif power >= 150:
-            score += 40
+        # Prefer arriving around 10–20%
+        score -= abs(
+            candidate.arrival_soc - 15
+        ) * 2
 
-        elif power >= 100:
-            score += 30
-
-        elif power >= 50:
-            score += 20
-
-        elif power >= 22:
-            score += 10
-
-        distance = charger.distance_km or 999
-
-        if distance <= 2:
-            score += 30
-
-        elif distance <= 5:
-            score += 20
-
-        elif distance <= 10:
-            score += 10
-
-        charger.score = score
-
-        return charger
+        return round(score, 2)

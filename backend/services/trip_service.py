@@ -1,10 +1,14 @@
 from backend.models.registry import VehicleRegistry
-from backend.services.battery_service import BatteryService
-from backend.services.battery_simulator import BatterySimulator
-from backend.services.charging_planner import ChargingPlanner
-from backend.services.energy_service import EnergyService
-from backend.services.geocoding_service import GeocodingService
-from backend.services.routing_service import RoutingService
+from backend.models.trip_plan import TripPlan
+
+from backend.services.adapters.geocoding_service import GeocodingService
+from backend.services.adapters.routing_service import RoutingService
+
+from backend.services.simulation.energy_service import EnergyService
+from backend.services.simulation.battery_service import BatteryService
+from backend.services.simulation.battery_simulator import BatterySimulator
+
+from backend.services.planning.charging_planner import ChargingPlanner
 
 
 class TripService:
@@ -33,8 +37,13 @@ class TripService:
             destination_coords
         )
 
-        print(f"Route points: {len(route.geometry)}")
-        print(f"Route segments: {len(route.segments)}")
+        trip = TripPlan(
+            vehicle=vehicle,
+            route=route
+        )
+
+        print(f"Route points: {len(trip.route.geometry)}")
+        print(f"Route segments: {len(trip.route.segments)}")
 
         predicted_efficiency = EnergyService.predict_efficiency(
             temperature=temperature,
@@ -42,28 +51,23 @@ class TripService:
             highway_ratio=highway_ratio
         )
 
-        battery_states = BatterySimulator.simulate(
-            route,
+        trip.battery_states = BatterySimulator.simulate(
+            trip.route,
             starting_soc,
             vehicle.usable_battery_kwh,
             predicted_efficiency
         )
 
         print(
-            f"Battery simulation points: {len(battery_states)}"
+            f"Battery simulation points: {len(trip.battery_states)}"
         )
 
         print(
-            f"Final SOC: {battery_states[-1].soc:.1f}%"
-        )
-
-        charging_plan = await ChargingPlanner.plan(
-            route,
-            battery_states
+            f"Final SOC: {trip.battery_states[-1].soc:.1f}%"
         )
 
         energy_needed = EnergyService.estimate_energy_needed(
-            distance_km=route.distance_km,
+            distance_km=trip.route.distance_km,
             efficiency=predicted_efficiency
         )
 
@@ -73,15 +77,32 @@ class TripService:
             energy_used=energy_needed
         )
 
+        trip.metadata["predicted_efficiency"] = predicted_efficiency
+        trip.metadata["energy_needed_kwh"] = energy_needed
+        trip.metadata["arrival_soc"] = arrival_soc
+
+        trip.recommended_chargers = await ChargingPlanner.plan(
+            trip
+        )
+
         return {
-            "vehicle": vehicle.name,
+            "vehicle": trip.vehicle.name,
             "origin": origin,
             "destination": destination,
-            "distance_km": round(route.distance_km, 1),
-            "duration_minutes": round(route.duration_minutes),
-            "predicted_efficiency": predicted_efficiency,
-            "energy_needed_kwh": round(energy_needed, 1),
-            "estimated_arrival_soc": round(arrival_soc, 1),
-            "charging_required": arrival_soc < vehicle.min_arrival_soc,
-            "charging_plan": charging_plan
+            "distance_km": round(trip.route.distance_km, 1),
+            "duration_minutes": round(trip.route.duration_minutes),
+            "predicted_efficiency": round(
+                trip.metadata["predicted_efficiency"], 1
+            ),
+            "energy_needed_kwh": round(
+                trip.metadata["energy_needed_kwh"], 1
+            ),
+            "estimated_arrival_soc": round(
+                trip.metadata["arrival_soc"], 1
+            ),
+            "charging_required": (
+                trip.metadata["arrival_soc"]
+                < trip.vehicle.min_arrival_soc
+            ),
+            "charging_plan": trip.recommended_chargers
         }

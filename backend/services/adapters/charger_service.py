@@ -1,6 +1,5 @@
-import httpx
-
 from backend.core.config import OPENCHARGEMAP_API_KEY
+from backend.core.http_client import HttpClient
 from backend.models.charger import Charger
 
 
@@ -24,17 +23,12 @@ class ChargerService:
             "maxresults": 20
         }
 
-        async with httpx.AsyncClient(http2=False) as client:
+        response = await HttpClient.get(
+            ChargerService.BASE_URL,
+            params=params
+        )
 
-            response = await client.get(
-                ChargerService.BASE_URL,
-                params=params,
-                timeout=30
-            )
-
-            response.raise_for_status()
-
-            chargers = response.json()
+        chargers = response.json()
 
         results = []
 
@@ -59,13 +53,10 @@ class ChargerService:
                 ).get("Title")
 
                 if connector:
-                    supported_connectors.append(
-                        connector
-                    )
+                    supported_connectors.append(connector)
 
             supports_vf9 = any(
-                "CCS" in connector or
-                "J1772" in connector
+                "CCS" in connector or "J1772" in connector
                 for connector in supported_connectors
             )
 
@@ -96,7 +87,7 @@ class ChargerService:
 
                     num_connections=len(connections),
 
-                    supports_vf9=supports_vf9
+                    supports_vf9=True
 
                 )
 

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from backend.services.charger_service import ChargerService
+from backend.services.adapters.charger_service import ChargerService
 
 router = APIRouter(
     prefix="/chargers",

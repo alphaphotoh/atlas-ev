@@ -1,7 +1,9 @@
-from backend.models.charging_candidate import ChargingCandidate
-from backend.services.corridor_service import CorridorService
-from backend.services.projection_service import ProjectionService
-from backend.services.search_window_service import SearchWindowService
+from backend.services.planning.candidate_builder import CandidateBuilder
+from backend.services.planning.candidate_selector import CandidateSelector
+from backend.services.planning.candidate_sorter import CandidateSorter
+from backend.services.planning.corridor_service import CorridorService
+from backend.services.planning.scoring_service import ScoringService
+from backend.services.planning.search_window_service import SearchWindowService
 
 
 class ChargingPlanner:
@@ -9,14 +11,16 @@ class ChargingPlanner:
     SEARCH_SOC = 25
 
     @staticmethod
-    async def plan(route, battery_states):
+    async def plan(trip):
 
         search_state = None
 
-        for state in battery_states:
+        for state in trip.battery_states:
 
             if state.soc <= ChargingPlanner.SEARCH_SOC:
+
                 search_state = state
+
                 break
 
         if search_state is None:
@@ -30,7 +34,7 @@ class ChargingPlanner:
         )
 
         window = SearchWindowService.build(
-            route,
+            trip.route,
             search_state
         )
 
@@ -42,39 +46,69 @@ class ChargingPlanner:
         )
 
         chargers = await CorridorService.find_chargers_in_window(
-            route,
+            trip.route,
             window
         )
 
         candidates = []
 
-        print()
-        print("Projected Chargers")
-        print("------------------")
-
         for charger in chargers:
 
-            charger = ProjectionService.project(
-                route,
-                charger
+            candidate = CandidateBuilder.build(
+                trip,
+                charger,
+                search_state
+            )
+
+            candidate.score = ScoringService.score(
+                candidate
+            )
+
+            candidates.append(candidate)
+
+        CandidateSorter.sort(candidates)
+
+        best = CandidateSelector.best(
+            candidates,
+            limit=10
+        )
+
+        print()
+        print("========== BEST CANDIDATES ==========")
+
+        for candidate in best:
+
+            print()
+
+            print(candidate.charger.name)
+
+            print(
+                f"Score: {candidate.score:.1f}"
             )
 
             print(
-                f"{charger.name}"
-                f" | Route {charger.route_distance_km:.1f} km"
-                f" | Detour {charger.detour_km:.2f} km"
+                f"Arrival SOC: "
+                f"{candidate.arrival_soc:.1f}%"
             )
 
-            candidates.append(
-
-                ChargingCandidate(
-
-                    charger=charger,
-
-                    arrival_soc=search_state.soc
-
-                )
-
+            print(
+                f"Departure SOC: "
+                f"{candidate.departure_soc:.1f}%"
             )
 
-        return candidates
+            print(
+                f"Energy Added: "
+                f"{candidate.charge_added_kwh:.1f} kWh"
+            )
+
+            print(
+                f"Charging Time: "
+                f"{candidate.charging_time_minutes:.1f} min"
+            )
+
+            print(
+                f"Detour: "
+                f"{candidate.charger.detour_km:.2f} km"
+            )
+
+        return best

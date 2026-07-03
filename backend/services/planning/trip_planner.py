@@ -1,5 +1,5 @@
 from backend.models.vehicles.vf9 import VF9
-from backend.services.energy import EnergyPredictor
+from backend.services.simulation.efficiency_predictor import EnergyPredictor
 
 
 class TripPlanner:

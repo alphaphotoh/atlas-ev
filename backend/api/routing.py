@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from backend.services.routing_service import RoutingService
+from backend.services.adapters.routing_service import RoutingService
 
 router = APIRouter(
     prefix="/route",

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from backend.services.geocoding_service import GeocodingService
+from backend.services.adapters.geocoding_service import GeocodingService
 
 router = APIRouter(
     prefix="/geocode",
