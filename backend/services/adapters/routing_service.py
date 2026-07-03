@@ -1,3 +1,5 @@
+import json
+
 from backend.core.config import ORS_API_KEY
 from backend.core.http_client import HttpClient
 
@@ -34,6 +36,15 @@ class RoutingService:
         data = response.json()
 
         ors_route = data["routes"][0]
+
+        print("\n========== ORS ROUTE KEYS ==========")
+        print(list(ors_route.keys()))
+
+        print("\n========== ORS SEGMENTS ==========")
+        print(json.dumps(
+            ors_route.get("segments", []),
+            indent=2
+        )[:10000])
 
         geometry = RouteUtils.decode_route(
             ors_route["geometry"]

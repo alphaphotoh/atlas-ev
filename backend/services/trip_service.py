@@ -10,6 +10,12 @@ from backend.services.simulation.battery_simulator import BatterySimulator
 
 from backend.services.planning.charging_planner import ChargingPlanner
 
+from backend.services.simulation.battery_simulator import BatterySimulator
+
+print(BatterySimulator)
+print(BatterySimulator.__module__)
+print(BatterySimulator.__dict__.keys())
+
 
 class TripService:
 
@@ -52,10 +58,12 @@ class TripService:
         )
 
         trip.battery_states = BatterySimulator.simulate(
-            trip.route,
-            starting_soc,
-            vehicle.usable_battery_kwh,
-            predicted_efficiency
+
+            route=trip.route,
+            starting_soc=starting_soc,
+            usable_battery_kwh=vehicle.usable_battery_kwh,
+            efficiency=predicted_efficiency
+
         )
 
         print(

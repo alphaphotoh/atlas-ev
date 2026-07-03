@@ -22,7 +22,10 @@ class BatterySimulator:
 
         for segment in route.segments:
 
-            energy = segment.length_km * energy_per_km
+            energy = (
+                segment.length_km *
+                energy_per_km
+            )
 
             remaining_energy -= energy
 

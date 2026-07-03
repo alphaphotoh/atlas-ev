@@ -2,9 +2,9 @@ class EnergyModel:
 
     @staticmethod
     def energy_used(
-        distance_km,
-        efficiency
-    ):
+        distance_km: float,
+        efficiency: float
+    ) -> float:
 
         return (
             distance_km *
