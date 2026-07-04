@@ -1,9 +1,9 @@
 from backend.services.planning.candidate_builder import CandidateBuilder
 from backend.services.planning.corridor_service import CorridorService
 from backend.services.planning.result_printer import ResultPrinter
-from backend.services.planning.search_window_service import SearchWindowService
 from backend.services.planning.optimizer.trip_optimizer import TripOptimizer
 from backend.services.planning.trip_simulator import TripSimulator
+from backend.services.planning.scoring_service import ScoringService
 
 
 class ChargingPlanner:
@@ -27,7 +27,6 @@ class ChargingPlanner:
         if search_state is None:
 
             print()
-
             print(
                 "Trip can be completed without charging."
             )
@@ -43,35 +42,38 @@ class ChargingPlanner:
             f"{search_state.distance_km:.1f} km"
         )
 
-        window = SearchWindowService.build(
+        chargers = await CorridorService.find_chargers(
 
-            trip.route,
+            trip
+
+        )
+
+        best_results = ChargingPlanner.build_results(
+
+            trip,
+
+            chargers,
 
             search_state
 
         )
 
-        print(
+        ResultPrinter.print(
 
-            f"Search Window: "
-
-            f"{window['start_distance']:.1f} km"
-
-            f" -> "
-
-            f"{window['end_distance']:.1f} km"
+            best_results
 
         )
 
-        chargers = await CorridorService.find_chargers_in_window(
+        return best_results
 
-            trip.route,
+    @staticmethod
+    def build_results(
+        trip,
+        chargers,
+        search_state
+    ):
 
-            window
-
-        )
-
-        candidates = []
+        trip.results = []
 
         for charger in chargers:
 
@@ -85,30 +87,67 @@ class ChargingPlanner:
 
             )
 
-            candidates.append(candidate)
+            #
+            # Reject chargers that cannot be reached
+            # while maintaining the minimum arrival SOC.
+            #
+            if (
+                candidate.arrival_soc <
+                trip.planning.minimum_charger_arrival_soc
+            ):
+                continue
 
-        trip.results = []
+            result = TripSimulator.simulate(
 
-        for candidate in candidates:
+                trip,
+
+                candidate
+
+            )
+
+            #
+            # Reject trips that arrive at the destination
+            # below the minimum reserve.
+            #
+            if (
+                result.destination_soc <
+                trip.planning.target_destination_soc
+            ):
+                continue
+
+            result.candidate.destination_arrival_soc = (
+                result.destination_soc
+            )
+
+            result.candidate.score = (
+
+                ScoringService.score(
+
+                    result.candidate
+
+                )
+
+            )
 
             trip.results.append(
 
-                TripSimulator.simulate(
-                    trip,
-                    candidate
-                )
+                result
 
             )
 
         trip.results.sort(
 
-            key=lambda result:
-            result.total_trip_time_minutes
+            key=lambda result: (
+
+                -result.candidate.score,
+
+                result.total_trip_time_minutes
+
+            )
 
         )
 
-
-        best_results = TripOptimizer.optimize(
+        return TripOptimizer.optimize(
 
             trip.results,
 
@@ -116,10 +155,11 @@ class ChargingPlanner:
 
         )
 
-        ResultPrinter.print(
+    @staticmethod
+    def best_result(results):
 
-            best_results
+        if not results:
 
-        )
+            return None
 
-        return best_results
+        return results[0]

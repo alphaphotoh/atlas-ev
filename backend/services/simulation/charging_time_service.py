@@ -1,59 +1,125 @@
 class ChargingTimeService:
 
+    #
+    # Average charging power (kW) by SOC.
+    # These are capped later by the charger's
+    # available power.
+    #
+    VF9_CHARGING_CURVE = [
+
+        (10, 100),
+
+        (20, 180),
+
+        (30, 180),
+
+        (40, 165),
+
+        (50, 145),
+
+        (60, 120),
+
+        (70, 95),
+
+        (80, 70),
+
+        (90, 45),
+
+        (101, 25)
+
+    ]
+
     @staticmethod
     def estimate(
         vehicle,
+        charger,
         arrival_soc,
         target_soc
     ):
 
         if target_soc <= arrival_soc:
+
             return 0.0, 0.0
 
-        energy_needed = (
-            vehicle.usable_battery_kwh *
-            (target_soc - arrival_soc) / 100
-        )
+        total_energy = 0.0
 
-        average_power = ChargingTimeService.average_power(
-            arrival_soc,
-            target_soc,
-            vehicle.dc_max_kw
-        )
+        total_minutes = 0.0
 
-        hours = energy_needed / average_power
+        soc = arrival_soc
 
-        minutes = hours * 60
+        while soc < target_soc:
+
+            next_soc = min(
+
+                soc + 1,
+
+                target_soc
+
+            )
+
+            energy = (
+
+                vehicle.usable_battery_kwh *
+
+                (next_soc - soc) / 100
+
+            )
+
+            curve_power = (
+
+                ChargingTimeService.power_at_soc(
+
+                    soc
+
+                )
+
+            )
+
+            charging_power = min(
+
+                curve_power,
+
+                charger.power_kw,
+
+                vehicle.dc_max_kw
+
+            )
+
+            hours = (
+
+                energy /
+
+                charging_power
+
+            )
+
+            total_energy += energy
+
+            total_minutes += hours * 60
+
+            soc = next_soc
 
         return (
-            round(energy_needed, 1),
-            round(minutes, 1)
+
+            round(total_energy, 1),
+
+            round(total_minutes, 1)
+
         )
 
     @staticmethod
-    def average_power(
-        arrival_soc,
-        target_soc,
-        peak_power
-    ):
+    def power_at_soc(soc):
 
-        average_soc = (
-            arrival_soc + target_soc
-        ) / 2
+        for limit, power in (
 
-        if average_soc < 20:
-            return peak_power
+            ChargingTimeService
 
-        elif average_soc < 40:
-            return peak_power * 0.90
+            .VF9_CHARGING_CURVE
 
-        elif average_soc < 60:
-            return peak_power * 0.75
+        ):
 
-        elif average_soc < 80:
-            return peak_power * 0.55
+            if soc < limit:
 
-        elif average_soc < 90:
-            return peak_power * 0.35
+                return power
 
-        return peak_power * 0.20
+        return 25

@@ -30,16 +30,33 @@ class TripSimulator:
             energy_used=energy_used
         )
 
+        destination_soc = round(
+            destination_soc,
+            1
+        )
+
+        candidate.destination_arrival_soc = (
+            destination_soc
+        )
+
+        requires_additional_stop = (
+            destination_soc <
+            trip.vehicle.min_arrival_soc
+        )
+
         if trip.simulation.average_speed <= 0:
+
             driving_time = 0
+
         else:
+
             driving_time = (
                 remaining_distance /
                 trip.simulation.average_speed
             ) * 60
 
         detour_time = (
-            candidate.charger.detour_km /
+            candidate.charger.detour_distance_km /
             TripSimulator.DETOUR_SPEED_KMH
         ) * 60
 
@@ -49,13 +66,19 @@ class TripSimulator:
             candidate.charging_time_minutes
         )
 
+        candidate.total_trip_time_minutes = round(
+            total_trip_time,
+            1
+        )
+
         return SimulationResult(
 
             candidate=candidate,
 
-            destination_soc=round(
-                destination_soc,
-                1
+            destination_soc=destination_soc,
+
+            requires_additional_stop=(
+                requires_additional_stop
             ),
 
             energy_used_kwh=round(

@@ -11,3 +11,11 @@ class BatteryState:
     soc: float
 
     energy_used_kwh: float
+
+    remaining_energy_kwh: float
+
+    efficiency_kwh_per_100km: float
+
+    speed_kmh: float
+
+    elapsed_time_minutes: float

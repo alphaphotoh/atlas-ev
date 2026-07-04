@@ -20,36 +20,52 @@ class CandidateBuilder:
         search_state
     ):
 
-        # Project charger onto the route
         projected = ProjectionService.project(
             trip.route,
             charger
         )
 
-        # Find the minimum departure SOC needed
+        arrival_state = trip.get_battery_state(
+            projected.route_distance_km
+        )
+
         departure_soc = DepartureOptimizer.optimize(
+
             trip=trip,
+
             charger=projected,
-            arrival_soc=search_state.soc
+
+            arrival_soc=arrival_state.soc
+
         )
 
-        # Estimate charging session
         energy_added, charging_time = (
+
             ChargingTimeService.estimate(
+
                 vehicle=trip.vehicle,
-                arrival_soc=search_state.soc,
+
+                charger=projected,
+
+                arrival_soc=arrival_state.soc,
+
                 target_soc=departure_soc
+
             )
+
         )
 
-        # Build candidate
         return ChargingCandidate(
 
             charger=projected,
 
-            arrival_soc=search_state.soc,
+            battery_state=arrival_state,
+
+            arrival_soc=arrival_state.soc,
 
             departure_soc=departure_soc,
+
+            destination_arrival_soc=0.0,
 
             charge_added_kwh=energy_added,
 

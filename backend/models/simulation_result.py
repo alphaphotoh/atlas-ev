@@ -10,6 +10,8 @@ class SimulationResult:
 
     destination_soc: float
 
+    requires_additional_stop: bool
+
     energy_used_kwh: float
 
     charging_time_minutes: float

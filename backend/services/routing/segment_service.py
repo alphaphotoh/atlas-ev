@@ -9,9 +9,13 @@ class SegmentService:
 
         segments = []
 
-        cumulative = 0
+        cumulative_distance = 0
 
         geometry = route.geometry
+
+        total_distance = route.distance_km
+
+        total_duration = route.duration_minutes
 
         for i in range(len(geometry) - 1):
 
@@ -24,11 +28,25 @@ class SegmentService:
                 end
             )
 
-            cumulative += length
+            cumulative_distance += length
+
+            if total_distance > 0:
+
+                duration = (
+                    length /
+                    total_distance
+                ) * total_duration
+
+            else:
+
+                duration = 0
 
             center = [
+
                 (start[0] + end[0]) / 2,
+
                 (start[1] + end[1]) / 2
+
             ]
 
             segments.append(
@@ -45,7 +63,9 @@ class SegmentService:
 
                     length_km=length,
 
-                    cumulative_distance_km=cumulative
+                    cumulative_distance_km=cumulative_distance,
+
+                    duration_minutes=duration
 
                 )
 

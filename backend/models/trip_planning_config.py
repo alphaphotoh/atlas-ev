@@ -10,13 +10,10 @@ class TripPlanningConfig:
     # Minimum SOC when arriving at destination
     target_destination_soc: float = 25.0
 
-    # Safety reserve added to calculated departure SOC
-    safety_buffer_soc: float = 10.0
-
-    # Road trip charging limit
+    # Maximum SOC to charge to on road trips
     road_trip_charge_limit: float = 100.0
 
-    # Normal daily charging limit
+    # Maximum SOC for normal daily charging
     city_charge_limit: float = 80.0
 
     # Ignore chargers below this power

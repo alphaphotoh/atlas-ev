@@ -11,7 +11,7 @@ VF9 = Vehicle(
 
     default_efficiency=31.0,
 
-    dc_max_kw=160,
+    dc_max_kw=180,
 
     ac_max_kw=11.5,
 

@@ -1,5 +1,6 @@
 from backend.models.registry import VehicleRegistry
 from backend.models.trip_plan import TripPlan
+from backend.models.simulation_context import SimulationContext
 
 from backend.services.adapters.geocoding_service import GeocodingService
 from backend.services.adapters.routing_service import RoutingService
@@ -8,13 +9,7 @@ from backend.services.simulation.energy_service import EnergyService
 from backend.services.simulation.battery_service import BatteryService
 from backend.services.simulation.battery_simulator import BatterySimulator
 
-from backend.services.planning.charging_planner import ChargingPlanner
-
-from backend.services.simulation.battery_simulator import BatterySimulator
-
-print(BatterySimulator)
-print(BatterySimulator.__module__)
-print(BatterySimulator.__dict__.keys())
+from backend.services.planning.trip_expander import TripExpander
 
 
 class TripService:
@@ -35,8 +30,13 @@ class TripService:
         origin_data = await GeocodingService.search(origin)
         destination_data = await GeocodingService.search(destination)
 
-        origin_coords = origin_data["features"][0]["geometry"]["coordinates"]
-        destination_coords = destination_data["features"][0]["geometry"]["coordinates"]
+        origin_coords = (
+            origin_data["features"][0]["geometry"]["coordinates"]
+        )
+
+        destination_coords = (
+            destination_data["features"][0]["geometry"]["coordinates"]
+        )
 
         route = await RoutingService.get_route(
             origin_coords,
@@ -67,11 +67,13 @@ class TripService:
         )
 
         print(
-            f"Battery simulation points: {len(trip.battery_states)}"
+            f"Battery simulation points: "
+            f"{len(trip.battery_states)}"
         )
 
         print(
-            f"Final SOC: {trip.battery_states[-1].soc:.1f}%"
+            f"Final SOC: "
+            f"{trip.battery_states[-1].soc:.1f}%"
         )
 
         energy_needed = EnergyService.estimate_energy_needed(
@@ -84,8 +86,6 @@ class TripService:
             usable_battery=vehicle.usable_battery_kwh,
             energy_used=energy_needed
         )
-
-        from backend.models.simulation_context import SimulationContext
 
         trip.simulation = SimulationContext(
 
@@ -103,31 +103,131 @@ class TripService:
 
         )
 
-        
-
-        trip.recommended_chargers = await ChargingPlanner.plan(
+        trip.legs = await TripExpander.expand(
             trip
         )
-        
 
         return {
+
             "vehicle": trip.vehicle.name,
+
             "origin": origin,
+
             "destination": destination,
-            "distance_km": round(trip.route.distance_km, 1),
-            "duration_minutes": round(trip.route.duration_minutes),
+
+            "distance_km": round(
+                trip.route.distance_km,
+                1
+            ),
+
+            "duration_minutes": round(
+                trip.route.duration_minutes
+            ),
+
             "predicted_efficiency": round(
-                trip.simulation.predicted_efficiency, 1
+                trip.simulation.predicted_efficiency,
+                1
             ),
+
             "energy_needed_kwh": round(
-                trip.simulation.energy_needed_kwh, 1
+                trip.simulation.energy_needed_kwh,
+                1
             ),
+
             "estimated_arrival_soc": round(
-                trip.simulation.arrival_soc, 1
+                trip.simulation.arrival_soc,
+                1
             ),
+
             "charging_required": (
                 trip.simulation.arrival_soc
                 < trip.vehicle.min_arrival_soc
             ),
-            "charging_plan": trip.recommended_chargers
+
+            "legs": [
+
+                {
+
+                    "leg": leg.number,
+
+                    "distance_km": round(
+                        leg.route.distance_km,
+                        1
+                    ),
+
+                    "duration_minutes": round(
+                        leg.route.duration_minutes
+                    ),
+
+                    "charger": (
+                        leg.selected_result
+                        .candidate
+                        .charger
+                        .name
+                    ),
+
+                    "network": (
+                        leg.selected_result
+                        .candidate
+                        .charger
+                        .network
+                    ),
+
+                    "power_kw": (
+                        leg.selected_result
+                        .candidate
+                        .charger
+                        .power_kw
+                    ),
+
+                    "arrival_soc": round(
+                        leg.selected_result
+                        .candidate
+                        .arrival_soc,
+                        1
+                    ),
+
+                    "departure_soc": round(
+                        leg.selected_result
+                        .candidate
+                        .departure_soc,
+                        1
+                    ),
+
+                    "destination_soc": round(
+                        leg.selected_result
+                        .destination_soc,
+                        1
+                    ),
+
+                    "charging_minutes": round(
+                        leg.selected_result
+                        .charging_time_minutes,
+                        1
+                    ),
+
+                    "driving_minutes": round(
+                        leg.selected_result
+                        .driving_time_minutes,
+                        1
+                    ),
+
+                    "detour_minutes": round(
+                        leg.selected_result
+                        .detour_time_minutes,
+                        1
+                    ),
+
+                    "total_minutes": round(
+                        leg.selected_result
+                        .total_trip_time_minutes,
+                        1
+                    )
+
+                }
+
+                for leg in trip.legs
+
+            ]
+
         }

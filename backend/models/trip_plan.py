@@ -7,6 +7,9 @@ from backend.models.simulation_context import SimulationContext
 from backend.models.battery_state import BatteryState
 from backend.models.charging_candidate import ChargingCandidate
 from backend.models.simulation_result import SimulationResult
+from backend.models.trip_leg import TripLeg
+
+
 
 
 @dataclass
@@ -33,3 +36,26 @@ class TripPlan:
     results: list[SimulationResult] = field(
         default_factory=list
     )
+
+    legs: list[TripLeg] = field(
+    default_factory=list
+    )
+
+    def get_battery_state(
+        self,
+        distance_km: float
+    ) -> BatteryState:
+
+        return min(
+
+            self.battery_states,
+
+            key=lambda state: abs(
+
+                state.distance_km -
+
+                distance_km
+
+            )
+
+        )

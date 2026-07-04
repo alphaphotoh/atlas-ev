@@ -15,3 +15,5 @@ class RouteSegment:
     length_km: float
 
     cumulative_distance_km: float
+
+    duration_minutes: float

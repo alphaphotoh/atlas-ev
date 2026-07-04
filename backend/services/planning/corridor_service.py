@@ -1,7 +1,9 @@
 import math
 
 from backend.services.adapters.charger_service import ChargerService
-from backend.services.planning.search_window_service import SearchWindowService
+from backend.services.planning.search_window_service import (
+    SearchWindowService,
+)
 from backend.utils.async_utils import AsyncUtils
 
 
@@ -41,7 +43,9 @@ class CorridorService:
     ):
 
         if spacing_km is None:
-            spacing_km = CorridorService.DEFAULT_SPACING_KM
+            spacing_km = (
+                CorridorService.DEFAULT_SPACING_KM
+            )
 
         if not coordinates:
             return []
@@ -54,9 +58,11 @@ class CorridorService:
 
         for point in coordinates[1:]:
 
-            accumulated += CorridorService.distance_km(
-                previous,
-                point
+            accumulated += (
+                CorridorService.distance_km(
+                    previous,
+                    point
+                )
             )
 
             if accumulated >= spacing_km:
@@ -68,7 +74,10 @@ class CorridorService:
             previous = point
 
         if sampled[-1] != coordinates[-1]:
-            sampled.append(coordinates[-1])
+
+            sampled.append(
+                coordinates[-1]
+            )
 
         return sampled
 
@@ -78,56 +87,176 @@ class CorridorService:
         for radius in (5, 10, 15):
 
             chargers = await ChargerService.search(
+
                 latitude=point[1],
+
                 longitude=point[0],
+
                 distance_km=radius
+
             )
 
             if chargers:
+
                 return chargers
 
         return []
 
     @staticmethod
-    async def find_chargers_in_window(
-        route,
-        window
+    def filter_chargers(
+        chargers,
+        trip
     ):
 
-        search_points = SearchWindowService.search_points(
-            route,
-            window
+        unique = {}
+
+        for charger in chargers:
+
+            if charger.id is None:
+                continue
+
+            if charger.power_kw is None:
+                continue
+
+            if (
+                charger.power_kw <
+                trip.planning.minimum_dc_power_kw
+            ):
+                continue
+
+            if not charger.supports_vf9:
+                continue
+
+            unique[charger.id] = charger
+
+        return list(
+            unique.values()
+        )
+
+    @staticmethod
+    async def find_chargers(
+        trip
+    ):
+
+        search_points = (
+
+            CorridorService.sample_route(
+
+                trip.route.geometry
+
+            )
+
         )
 
         print(
-            f"Search points in window: {len(search_points)}"
+            f"Route search points: "
+            f"{len(search_points)}"
         )
 
         tasks = [
+
             CorridorService.search_point(
-                point["coordinate"]
+                point
             )
+
             for point in search_points
+
         ]
 
-        search_results = await AsyncUtils.gather(tasks)
+        search_results = (
 
-        unique_chargers = {}
+            await AsyncUtils.gather(tasks)
 
-        for chargers in search_results:
+        )
 
-            for charger in chargers:
+        chargers = []
 
-                if charger.id is None:
-                    continue
+        for result in search_results:
 
-                if charger.id not in unique_chargers:
-                    unique_chargers[charger.id] = charger
+            chargers.extend(result)
 
-        chargers = list(unique_chargers.values())
+        chargers = (
+
+            CorridorService.filter_chargers(
+
+                chargers,
+
+                trip
+
+            )
+
+        )
 
         print(
-            f"Window chargers: {len(chargers)}"
+            f"Route chargers: "
+            f"{len(chargers)}"
+        )
+
+        return chargers
+
+    @staticmethod
+    async def find_chargers_in_window(
+        route,
+        window,
+        trip
+    ):
+
+        search_points = (
+
+            SearchWindowService.search_points(
+
+                route,
+
+                window
+
+            )
+
+        )
+
+        print(
+            f"Search points in window: "
+            f"{len(search_points)}"
+        )
+
+        tasks = [
+
+            CorridorService.search_point(
+
+                point["coordinate"]
+
+            )
+
+            for point in search_points
+
+        ]
+
+        search_results = (
+
+            await AsyncUtils.gather(tasks)
+
+        )
+
+        chargers = []
+
+        for result in search_results:
+
+            chargers.extend(result)
+
+        chargers = (
+
+            CorridorService.filter_chargers(
+
+                chargers,
+
+                trip
+
+            )
+
+        )
+
+        print(
+            f"Window chargers: "
+            f"{len(chargers)}"
         )
 
         return chargers
