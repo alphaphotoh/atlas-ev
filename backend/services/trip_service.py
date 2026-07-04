@@ -103,7 +103,7 @@ class TripService:
 
         )
 
-        trip.legs = await TripExpander.expand(
+        itinerary = await TripExpander.expand(
             trip
         )
 
@@ -226,8 +226,34 @@ class TripService:
 
                 }
 
-                for leg in trip.legs
+                for leg in itinerary.legs
 
-            ]
+            ],
+
+            "summary": {
+
+                "stops": itinerary.stops,
+
+                "total_driving_minutes": round(
+                    itinerary.total_driving_minutes,
+                    1
+                ),
+
+                "total_charging_minutes": round(
+                    itinerary.total_charging_minutes,
+                    1
+                ),
+
+                "total_detour_minutes": round(
+                    itinerary.total_detour_minutes,
+                    1
+                ),
+
+                "total_trip_minutes": round(
+                    itinerary.total_trip_minutes,
+                    1
+                )
+
+            }
 
         }

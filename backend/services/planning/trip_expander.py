@@ -1,3 +1,4 @@
+from backend.models.trip_itinerary import TripItinerary
 from backend.models.trip_leg import TripLeg
 from backend.models.trip_plan import TripPlan
 
@@ -13,7 +14,7 @@ class TripExpander:
     @staticmethod
     async def expand(trip):
 
-        legs = []
+        itinerary = TripItinerary()
 
         await TripExpander.plan_leg(
 
@@ -21,24 +22,26 @@ class TripExpander:
 
             stop_number=1,
 
-            legs=legs
+            itinerary=itinerary
 
         )
+
+        itinerary.recalculate()
 
         print()
 
         print(
             f"Trip contains "
-            f"{len(legs)} leg(s)"
+            f"{itinerary.stops} leg(s)"
         )
 
-        return legs
+        return itinerary
 
     @staticmethod
     async def plan_leg(
         trip,
         stop_number,
-        legs
+        itinerary
     ):
 
         results = await ChargingPlanner.plan(
@@ -69,7 +72,7 @@ class TripExpander:
 
         )
 
-        legs.append(
+        itinerary.legs.append(
             leg
         )
 
@@ -118,7 +121,7 @@ class TripExpander:
 
                 stop_number + 1,
 
-                legs
+                itinerary
 
             )
 
@@ -127,7 +130,7 @@ class TripExpander:
         trip,
         best_result,
         stop_number,
-        legs
+        itinerary
     ):
 
         print()
@@ -193,6 +196,6 @@ class TripExpander:
 
             stop_number=stop_number,
 
-            legs=legs
+            itinerary=itinerary
 
         )
