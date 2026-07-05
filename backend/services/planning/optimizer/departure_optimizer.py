@@ -7,6 +7,44 @@ class DepartureOptimizer:
         arrival_soc
     ):
 
+        required_soc = DepartureOptimizer.required_soc(
+
+            trip,
+
+            charger
+
+        )
+
+        departure_soc = max(
+
+            required_soc,
+
+            arrival_soc
+
+        )
+
+        departure_soc = min(
+
+            departure_soc,
+
+            trip.planning.road_trip_charge_limit
+
+        )
+
+        return round(
+
+            departure_soc,
+
+            1
+
+        )
+
+    @staticmethod
+    def required_soc(
+        trip,
+        charger
+    ):
+
         remaining_distance = (
 
             trip.route.distance_km -
@@ -33,34 +71,10 @@ class DepartureOptimizer:
 
         ) * 100
 
-        departure_soc = (
+        return (
 
             soc_needed +
 
             trip.planning.target_destination_soc
-
-        )
-
-        departure_soc = max(
-
-            departure_soc,
-
-            arrival_soc
-
-        )
-
-        departure_soc = min(
-
-            departure_soc,
-
-            trip.planning.road_trip_charge_limit
-
-        )
-
-        return round(
-
-            departure_soc,
-
-            1
 
         )
