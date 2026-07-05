@@ -84,7 +84,9 @@ class GraphSearch:
 
                     depth=node.depth + 1,
 
-                    parent=node
+                    parent=node,
+
+                    g_cost=itinerary.total_trip_minutes
 
                 )
 

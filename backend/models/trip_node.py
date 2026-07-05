@@ -18,3 +18,5 @@ class TripNode:
     parent: "TripNode | None" = None
 
     score: float = 0.0
+
+    g_cost: float = 0.0

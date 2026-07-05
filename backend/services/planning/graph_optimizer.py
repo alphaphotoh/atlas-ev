@@ -1,7 +1,22 @@
 class GraphOptimizer:
 
     @staticmethod
-    def best(nodes):
+    def priority(
+        node
+    ):
+
+        return (
+
+            node.g_cost,
+
+            node.depth
+
+        )
+
+    @staticmethod
+    def best(
+        nodes
+    ):
 
         if not nodes:
 
