@@ -1,10 +1,8 @@
 from backend.models.trip_itinerary import TripItinerary
 from backend.models.trip_leg import TripLeg
-from backend.models.trip_plan import TripPlan
 
-from backend.services.adapters.routing_service import RoutingService
 from backend.services.planning.charging_planner import ChargingPlanner
-from backend.services.simulation.battery_simulator import BatterySimulator
+from backend.services.planning.trip_builder import TripBuilder
 
 
 class TripExpander:
@@ -72,7 +70,7 @@ class TripExpander:
 
         )
 
-        itinerary.legs.append(
+        itinerary.add_leg(
             leg
         )
 
@@ -142,46 +140,13 @@ class TripExpander:
             f"{best_result.candidate.departure_soc:.1f}%"
         )
 
-        charger = best_result.candidate.charger
+        next_trip = await TripBuilder.build(
 
-        destination = trip.route.geometry[-1]
+            trip=trip,
 
-        route = await RoutingService.get_route(
+            charger=best_result.candidate.charger,
 
-            [
-                charger.longitude,
-                charger.latitude
-            ],
-
-            destination
-
-        )
-
-        next_trip = TripPlan(
-
-            vehicle=trip.vehicle,
-
-            route=route
-
-        )
-
-        next_trip.planning = trip.planning
-
-        next_trip.simulation = trip.simulation
-
-        next_trip.battery_states = (
-
-            BatterySimulator.simulate(
-
-                route=route,
-
-                starting_soc=best_result.candidate.departure_soc,
-
-                usable_battery_kwh=trip.vehicle.usable_battery_kwh,
-
-                efficiency=trip.simulation.predicted_efficiency
-
-            )
+            departure_soc=best_result.candidate.departure_soc
 
         )
 

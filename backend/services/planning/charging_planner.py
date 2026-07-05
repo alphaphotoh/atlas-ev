@@ -4,6 +4,9 @@ from backend.services.planning.result_printer import ResultPrinter
 from backend.services.planning.optimizer.trip_optimizer import TripOptimizer
 from backend.services.planning.trip_simulator import TripSimulator
 from backend.services.planning.scoring_service import ScoringService
+from backend.services.simulation.battery_state_service import (
+    BatteryStateService,
+)
 
 
 class ChargingPlanner:
@@ -11,22 +14,18 @@ class ChargingPlanner:
     @staticmethod
     async def plan(trip):
 
-        minimum_soc = (
+        search_state = BatteryStateService.first_below_soc(
+
+            trip.battery_states,
+
             trip.planning.minimum_charger_arrival_soc
+
         )
-
-        search_state = None
-
-        for state in trip.battery_states:
-
-            if state.soc <= minimum_soc:
-
-                search_state = state
-                break
 
         if search_state is None:
 
             print()
+
             print(
                 "Trip can be completed without charging."
             )
@@ -36,11 +35,30 @@ class ChargingPlanner:
         print()
 
         print(
+
             f"Battery reaches "
+
             f"{search_state.soc:.1f}% "
+
             f"at "
+
             f"{search_state.distance_km:.1f} km"
+
         )
+
+        return await ChargingPlanner.plan_next_hop(
+
+            trip=trip,
+
+            search_state=search_state
+
+        )
+
+    @staticmethod
+    async def plan_next_hop(
+        trip,
+        search_state
+    ):
 
         chargers = await CorridorService.find_chargers(
 
@@ -48,29 +66,29 @@ class ChargingPlanner:
 
         )
 
-        best_results = ChargingPlanner.build_results(
+        results = ChargingPlanner.plan_from_state(
 
-            trip,
+            trip=trip,
 
-            chargers,
+            search_state=search_state,
 
-            search_state
+            chargers=chargers
 
         )
 
         ResultPrinter.print(
 
-            best_results
+            results
 
         )
 
-        return best_results
+        return results
 
     @staticmethod
-    def build_results(
+    def plan_from_state(
         trip,
-        chargers,
-        search_state
+        search_state,
+        chargers
     ):
 
         trip.results = []
@@ -79,11 +97,11 @@ class ChargingPlanner:
 
             candidate = CandidateBuilder.build(
 
-                trip,
+                trip=trip,
 
-                charger,
+                charger=charger,
 
-                search_state
+                search_state=search_state
 
             )
 
@@ -92,9 +110,13 @@ class ChargingPlanner:
             # while maintaining the minimum arrival SOC.
             #
             if (
+
                 candidate.arrival_soc <
+
                 trip.planning.minimum_charger_arrival_soc
+
             ):
+
                 continue
 
             result = TripSimulator.simulate(
@@ -110,13 +132,19 @@ class ChargingPlanner:
             # below the minimum reserve.
             #
             if (
+
                 result.destination_soc <
+
                 trip.planning.target_destination_soc
+
             ):
+
                 continue
 
             result.candidate.destination_arrival_soc = (
+
                 result.destination_soc
+
             )
 
             result.candidate.score = (

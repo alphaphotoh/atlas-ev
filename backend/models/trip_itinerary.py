@@ -25,6 +25,52 @@ class TripItinerary:
             self.legs
         )
 
+    @property
+    def last_leg(self) -> TripLeg | None:
+
+        if not self.legs:
+
+            return None
+
+        return self.legs[-1]
+
+    @property
+    def destination_soc(self) -> float:
+
+        if not self.last_leg:
+
+            return 0.0
+
+        return (
+            self.last_leg
+            .selected_result
+            .destination_soc
+        )
+
+    @property
+    def completed(self) -> bool:
+
+        if not self.last_leg:
+
+            return False
+
+        return (
+            not self.last_leg
+            .selected_result
+            .requires_additional_stop
+        )
+
+    def add_leg(
+        self,
+        leg: TripLeg
+    ):
+
+        self.legs.append(
+            leg
+        )
+
+        self.recalculate()
+
     def recalculate(self):
 
         self.total_driving_minutes = sum(
