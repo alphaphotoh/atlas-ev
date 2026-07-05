@@ -1,4 +1,5 @@
 from backend.services.planning.graph_planner import GraphPlanner
+from backend.models.trip_itinerary import TripItinerary
 
 
 class GraphExecutor:
@@ -12,9 +13,17 @@ class GraphExecutor:
             trip
         )
 
+        #
+        # Temporary fallback while graph search
+        # is still under development.
+        #
         if node is None:
 
-            return None
+            itinerary = TripItinerary()
+
+            itinerary.recalculate()
+
+            return itinerary
 
         node.itinerary.recalculate()
 

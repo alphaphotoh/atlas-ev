@@ -33,6 +33,10 @@ class TripBuilder:
 
         next_trip.simulation = trip.simulation
 
+        next_trip.corridor_chargers = (
+            trip.corridor_chargers
+        )
+
         next_trip.battery_states = (
 
             BatterySimulator.simulate(
@@ -47,6 +51,14 @@ class TripBuilder:
 
             )
 
+        )
+
+        next_trip.remaining_distance_km = (
+            route.distance_km
+        )
+
+        next_trip.starting_soc = (
+            departure_soc
         )
 
         return next_trip

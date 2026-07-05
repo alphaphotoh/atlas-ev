@@ -5,9 +5,9 @@ class HttpClient:
 
     TIMEOUT = httpx.Timeout(
         connect=20.0,
-        read=30.0,
-        write=20.0,
-        pool=20.0
+        read=120.0,
+        write=30.0,
+        pool=30.0
     )
 
     client = httpx.AsyncClient(

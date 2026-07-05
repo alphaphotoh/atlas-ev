@@ -4,12 +4,19 @@ from backend.models.simulation_context import SimulationContext
 
 from backend.services.adapters.geocoding_service import GeocodingService
 from backend.services.adapters.routing_service import RoutingService
+from backend.services.adapters.weather_service import WeatherService
 
 from backend.services.simulation.energy_service import EnergyService
 from backend.services.simulation.battery_service import BatteryService
 from backend.services.simulation.battery_simulator import BatterySimulator
+from backend.services.simulation.efficiency_profile_service import (
+    EfficiencyProfileService,
+)
 
 from backend.services.planning.trip_expander import TripExpander
+from backend.services.planning.route_weather_service import (
+    RouteWeatherService,
+)
 
 
 class TripService:
@@ -20,7 +27,6 @@ class TripService:
         origin: str,
         destination: str,
         starting_soc: float,
-        temperature: float,
         average_speed: float,
         highway_ratio: float
     ):
@@ -38,53 +44,94 @@ class TripService:
             destination_data["features"][0]["geometry"]["coordinates"]
         )
 
+        weather = await WeatherService.get_weather(
+
+            latitude=origin_coords[1],
+
+            longitude=origin_coords[0]
+
+        )
+
         route = await RoutingService.get_route(
+
             origin_coords,
+
             destination_coords
+
         )
 
         trip = TripPlan(
+
             vehicle=vehicle,
+
             route=route
+
         )
 
-        print(f"Route points: {len(trip.route.geometry)}")
-        print(f"Route segments: {len(trip.route.segments)}")
+        trip.weather_samples = (
+
+            await RouteWeatherService.sample(
+
+                route
+
+            )
+
+        )
 
         predicted_efficiency = EnergyService.predict_efficiency(
-            temperature=temperature,
+
+            temperature=weather.temperature_c,
+
             average_speed=average_speed,
+
             highway_ratio=highway_ratio
+
+        )
+
+        trip.efficiency_profile = (
+
+            EfficiencyProfileService.build(
+
+                route=route,
+
+                weather_samples=trip.weather_samples,
+
+                base_efficiency=predicted_efficiency
+
+            )
+
         )
 
         trip.battery_states = BatterySimulator.simulate(
 
             route=trip.route,
+
             starting_soc=starting_soc,
+
             usable_battery_kwh=vehicle.usable_battery_kwh,
-            efficiency=predicted_efficiency
 
-        )
+            efficiency=predicted_efficiency,
 
-        print(
-            f"Battery simulation points: "
-            f"{len(trip.battery_states)}"
-        )
+            efficiency_profile=trip.efficiency_profile
 
-        print(
-            f"Final SOC: "
-            f"{trip.battery_states[-1].soc:.1f}%"
         )
 
         energy_needed = EnergyService.estimate_energy_needed(
+
             distance_km=trip.route.distance_km,
+
             efficiency=predicted_efficiency
+
         )
 
         arrival_soc = BatteryService.estimate_arrival_soc(
+
             starting_soc=starting_soc,
+
             usable_battery=vehicle.usable_battery_kwh,
+
             energy_used=energy_needed
+
         )
 
         trip.simulation = SimulationContext(
@@ -97,7 +144,7 @@ class TripService:
 
             average_speed=average_speed,
 
-            temperature=temperature,
+            temperature=weather.temperature_c,
 
             highway_ratio=highway_ratio
 
@@ -114,6 +161,60 @@ class TripService:
             "origin": origin,
 
             "destination": destination,
+
+            "weather": {
+
+                "temperature_c": weather.temperature_c,
+
+                "wind_speed_kph": weather.wind_speed_kph,
+
+                "wind_direction_degrees": weather.wind_direction_degrees,
+
+                "humidity_percent": weather.humidity_percent,
+
+                "pressure_hpa": weather.pressure_hpa,
+
+                "precipitation_mm": weather.precipitation_mm,
+
+                "snowfall_cm": weather.snowfall_cm
+
+            },
+
+            "route_weather": [
+
+                {
+
+                    "distance_km": sample.route_distance_km,
+
+                    "temperature_c": sample.weather.temperature_c,
+
+                    "wind_speed_kph": sample.weather.wind_speed_kph,
+
+                    "wind_direction_degrees": sample.weather.wind_direction_degrees,
+
+                    "precipitation_mm": sample.weather.precipitation_mm,
+
+                    "snowfall_cm": sample.weather.snowfall_cm
+
+                }
+
+                for sample in trip.weather_samples
+
+            ],
+
+            "efficiency_profile": [
+
+                {
+
+                    "distance_km": sample.distance_km,
+
+                    "efficiency": sample.efficiency
+
+                }
+
+                for sample in trip.efficiency_profile
+
+            ],
 
             "distance_km": round(
                 trip.route.distance_km,

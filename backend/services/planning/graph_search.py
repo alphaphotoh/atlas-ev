@@ -32,7 +32,9 @@ class GraphSearch:
 
             trip=node.trip,
 
-            search_state=search_state
+            search_state=search_state,
+
+            chargers=node.trip.corridor_chargers
 
         )
 
@@ -86,7 +88,9 @@ class GraphSearch:
 
                     parent=node,
 
-                    g_cost=itinerary.total_trip_minutes
+                    g_cost=itinerary.total_trip_minutes,
+
+                    h_cost=0.0
 
                 )
 

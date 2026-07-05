@@ -20,3 +20,15 @@ class TripNode:
     score: float = 0.0
 
     g_cost: float = 0.0
+
+    h_cost: float = 0.0
+
+    @property
+    def f_cost(
+        self
+    ) -> float:
+
+        return (
+            self.g_cost +
+            self.h_cost
+        )

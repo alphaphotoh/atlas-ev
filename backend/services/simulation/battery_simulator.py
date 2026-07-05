@@ -8,21 +8,14 @@ class BatterySimulator:
         route,
         starting_soc,
         usable_battery_kwh,
-        efficiency
+        efficiency,
+        efficiency_profile=None
     ):
 
         print()
         print("========== BATTERY SIMULATION ==========")
         print(f"Starting SOC: {starting_soc}%")
         print(f"Usable Battery: {usable_battery_kwh} kWh")
-        print(f"Efficiency: {efficiency} kWh/100km")
-
-        if route.segments:
-
-            first = route.segments[0]
-
-            print(f"First Segment Length: {first.length_km:.3f} km")
-            print(f"First Segment Duration: {first.duration_minutes:.3f} min")
 
         states = []
 
@@ -31,17 +24,40 @@ class BatterySimulator:
             starting_soc / 100
         )
 
-        energy_per_km = (
-            efficiency / 100
-        )
-
         elapsed_minutes = 0
 
         for segment in route.segments:
 
+            current_efficiency = efficiency
+
+            if efficiency_profile:
+
+                current_efficiency = min(
+
+                    efficiency_profile,
+
+                    key=lambda sample: abs(
+
+                        sample.distance_km -
+
+                        segment.cumulative_distance_km
+
+                    )
+
+                ).efficiency
+
+            energy_per_km = (
+
+                current_efficiency / 100
+
+            )
+
             energy = (
+
                 segment.length_km *
+
                 energy_per_km
+
             )
 
             if segment.index < 5:
@@ -50,9 +66,25 @@ class BatterySimulator:
 
                 print(f"Segment {segment.index}")
 
-                print(f"Length: {segment.length_km:.3f} km")
+                print(
+                    f"Distance: "
+                    f"{segment.cumulative_distance_km:.1f} km"
+                )
 
-                print(f"Energy Used: {energy:.3f} kWh")
+                print(
+                    f"Efficiency: "
+                    f"{current_efficiency:.2f} kWh/100km"
+                )
+
+                print(
+                    f"Length: "
+                    f"{segment.length_km:.3f} km"
+                )
+
+                print(
+                    f"Energy Used: "
+                    f"{energy:.3f} kWh"
+                )
 
                 print(
                     f"Remaining Before: "
@@ -62,8 +94,11 @@ class BatterySimulator:
             remaining_energy -= energy
 
             remaining_energy = max(
+
                 remaining_energy,
+
                 0
+
             )
 
             if segment.index < 5:
@@ -74,12 +109,17 @@ class BatterySimulator:
                 )
 
             elapsed_minutes += (
+
                 segment.duration_minutes
+
             )
 
             soc = (
+
                 remaining_energy /
+
                 usable_battery_kwh
+
             ) * 100
 
             speed = 0
@@ -87,13 +127,19 @@ class BatterySimulator:
             if segment.duration_minutes > 0:
 
                 speed = (
+
                     segment.length_km /
+
                     segment.duration_minutes
+
                 ) * 60
 
             if segment.index < 5:
 
-                print(f"SOC: {soc:.2f}%")
+                print(
+                    f"SOC: "
+                    f"{soc:.2f}%"
+                )
 
             states.append(
 
@@ -109,7 +155,7 @@ class BatterySimulator:
 
                     remaining_energy_kwh=remaining_energy,
 
-                    efficiency_kwh_per_100km=efficiency,
+                    efficiency_kwh_per_100km=current_efficiency,
 
                     speed_kmh=speed,
 
@@ -120,6 +166,7 @@ class BatterySimulator:
             )
 
         print()
+
         print(
             f"Final Remaining Energy: "
             f"{remaining_energy:.2f} kWh"

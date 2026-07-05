@@ -7,7 +7,7 @@ class GraphOptimizer:
 
         return (
 
-            node.g_cost,
+            node.f_cost,
 
             node.depth
 

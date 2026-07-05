@@ -1,6 +1,7 @@
 import math
 
 from backend.services.adapters.charger_service import ChargerService
+from backend.services.planning.corridor_cache import CorridorCache
 from backend.services.planning.search_window_service import (
     SearchWindowService,
 )
@@ -138,6 +139,19 @@ class CorridorService:
         trip
     ):
 
+        cached = CorridorCache.get(
+            trip.route
+        )
+
+        if cached is not None:
+
+            print(
+                f"Route chargers (cached): "
+                f"{len(cached)}"
+            )
+
+            return cached
+
         search_points = (
 
             CorridorService.sample_route(
@@ -184,6 +198,14 @@ class CorridorService:
                 trip
 
             )
+
+        )
+
+        CorridorCache.set(
+
+            trip.route,
+
+            chargers
 
         )
 

@@ -8,8 +8,8 @@ from backend.models.battery_state import BatteryState
 from backend.models.charging_candidate import ChargingCandidate
 from backend.models.simulation_result import SimulationResult
 from backend.models.trip_leg import TripLeg
-
-
+from backend.models.weather_sample import WeatherSample
+from backend.models.efficiency_sample import EfficiencySample
 
 
 @dataclass
@@ -25,7 +25,23 @@ class TripPlan:
 
     simulation: SimulationContext | None = None
 
+    remaining_distance_km: float = 0.0
+
+    starting_soc: float = 100.0
+
     battery_states: list[BatteryState] = field(
+        default_factory=list
+    )
+
+    weather_samples: list[WeatherSample] = field(
+        default_factory=list
+    )
+
+    efficiency_profile: list[EfficiencySample] = field(
+        default_factory=list
+    )
+
+    corridor_chargers: list = field(
         default_factory=list
     )
 
@@ -38,7 +54,7 @@ class TripPlan:
     )
 
     legs: list[TripLeg] = field(
-    default_factory=list
+        default_factory=list
     )
 
     def get_battery_state(

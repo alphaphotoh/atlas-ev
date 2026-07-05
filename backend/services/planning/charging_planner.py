@@ -57,14 +57,29 @@ class ChargingPlanner:
     @staticmethod
     async def plan_next_hop(
         trip,
-        search_state
+        search_state,
+        chargers=None
     ):
 
-        chargers = await CorridorService.find_chargers(
+        if chargers is None:
 
-            trip
+            if trip.corridor_chargers:
 
-        )
+                chargers = (
+                    trip.corridor_chargers
+                )
+
+            else:
+
+                chargers = await CorridorService.find_chargers(
+
+                    trip
+
+                )
+
+                trip.corridor_chargers = (
+                    chargers
+                )
 
         results = ChargingPlanner.plan_from_state(
 
@@ -105,10 +120,6 @@ class ChargingPlanner:
 
             )
 
-            #
-            # Reject chargers that cannot be reached
-            # while maintaining the minimum arrival SOC.
-            #
             if (
 
                 candidate.arrival_soc <
@@ -127,10 +138,6 @@ class ChargingPlanner:
 
             )
 
-            #
-            # Reject trips that arrive at the destination
-            # below the minimum reserve.
-            #
             if (
 
                 result.destination_soc <

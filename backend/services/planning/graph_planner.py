@@ -1,4 +1,4 @@
-import heapq
+from collections import deque
 
 from backend.models.trip_node import TripNode
 
@@ -17,34 +17,24 @@ class GraphPlanner:
             trip=trip
         )
 
-        frontier = []
-
-        heapq.heappush(
-
-            frontier,
-
-            (
-
-                *GraphOptimizer.priority(
-                    root
-                ),
-
-
-                root
-
-            )
-
+        frontier = deque(
+            [root]
         )
 
         completed = []
 
         while frontier:
 
-            _, _, node = heapq.heappop(
-                frontier
-            )
+            node = frontier.popleft()
 
-            if node.itinerary.completed:
+            #
+            # A trip that can now reach the
+            # destination is complete.
+            #
+            if (
+                node.trip.simulation.arrival_soc >=
+                node.trip.planning.target_destination_soc
+            ):
 
                 completed.append(
                     node
@@ -60,23 +50,25 @@ class GraphPlanner:
                 node
             )
 
-            for child in children:
+            if not children:
 
-                heapq.heappush(
+                continue
 
-                    frontier,
+            children.sort(
 
-                    (
+                key=lambda child: (
 
-                        *GraphOptimizer.priority(
-                            child
-                        ),
+                    child.f_cost,
 
-                        child
-
-                    )
+                    child.depth
 
                 )
+
+            )
+
+            frontier.extend(
+                children
+            )
 
         return GraphOptimizer.best(
             completed
