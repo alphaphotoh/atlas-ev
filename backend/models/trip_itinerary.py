@@ -50,12 +50,25 @@ class TripItinerary:
     @property
     def completed(self) -> bool:
 
+        return (
+
+            self.last_leg is not None
+
+            and
+
+            not self.last_leg.selected_result.requires_additional_stop
+
+        )
+
+    @property
+    def requires_additional_stop(self) -> bool:
+
         if not self.last_leg:
 
             return False
 
         return (
-            not self.last_leg
+            self.last_leg
             .selected_result
             .requires_additional_stop
         )
