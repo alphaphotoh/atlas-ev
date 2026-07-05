@@ -1,3 +1,5 @@
+from collections import deque
+
 from backend.models.trip_node import TripNode
 
 from backend.services.planning.graph_optimizer import GraphOptimizer
@@ -15,18 +17,16 @@ class GraphPlanner:
             trip=trip
         )
 
-        frontier = [root]
+        frontier = deque(
+            [root]
+        )
 
         completed = []
 
         while frontier:
 
-            node = frontier.pop(0)
+            node = frontier.popleft()
 
-            #
-            # If this itinerary reaches the destination,
-            # keep it as a completed solution.
-            #
             if node.itinerary.completed:
 
                 completed.append(
@@ -35,9 +35,6 @@ class GraphPlanner:
 
                 continue
 
-            #
-            # Prevent infinite expansion.
-            #
             if node.depth >= GraphPlanner.MAX_DEPTH:
 
                 continue
@@ -46,12 +43,21 @@ class GraphPlanner:
                 node
             )
 
-            #
-            # Dead end.
-            #
             if not children:
 
                 continue
+
+            children.sort(
+
+                key=lambda child: (
+
+                    child.itinerary.total_trip_minutes,
+
+                    child.depth
+
+                )
+
+            )
 
             frontier.extend(
                 children

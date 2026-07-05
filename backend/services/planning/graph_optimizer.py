@@ -7,16 +7,20 @@ class GraphOptimizer:
 
             return None
 
-        return min(
-
-            nodes,
+        nodes.sort(
 
             key=lambda node: (
 
                 node.itinerary.total_trip_minutes,
+
+                node.itinerary.total_charging_minutes,
+
+                node.itinerary.total_detour_minutes,
 
                 node.depth
 
             )
 
         )
+
+        return nodes[0]

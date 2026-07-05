@@ -4,14 +4,25 @@ from backend.services.planning.graph_planner import GraphPlanner
 class GraphExecutor:
 
     @staticmethod
-   async def execute(trip):
+    async def execute(
+        trip
+    ):
 
-        best = await GraphPlanner.plan(
+        node = await GraphPlanner.plan(
             trip
         )
 
-        if best is None:
+        if node is None:
 
             return None
 
-        return best.itinerary
+        node.itinerary.recalculate()
+
+        print()
+
+        print(
+            f"Trip contains "
+            f"{node.itinerary.stops} leg(s)"
+        )
+
+        return node.itinerary
