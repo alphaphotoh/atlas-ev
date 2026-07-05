@@ -23,6 +23,10 @@ class GraphPlanner:
 
             node = frontier.pop(0)
 
+            #
+            # If this itinerary reaches the destination,
+            # keep it as a completed solution.
+            #
             if node.itinerary.completed:
 
                 completed.append(
@@ -31,6 +35,9 @@ class GraphPlanner:
 
                 continue
 
+            #
+            # Prevent infinite expansion.
+            #
             if node.depth >= GraphPlanner.MAX_DEPTH:
 
                 continue
@@ -38,6 +45,13 @@ class GraphPlanner:
             children = await GraphSearch.expand(
                 node
             )
+
+            #
+            # Dead end.
+            #
+            if not children:
+
+                continue
 
             frontier.extend(
                 children

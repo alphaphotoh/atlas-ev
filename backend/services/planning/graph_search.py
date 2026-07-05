@@ -4,6 +4,9 @@ from backend.models.trip_leg import TripLeg
 
 from backend.services.planning.charging_planner import ChargingPlanner
 from backend.services.planning.trip_builder import TripBuilder
+from backend.services.simulation.battery_state_service import (
+    BatteryStateService,
+)
 
 
 class GraphSearch:
@@ -13,8 +16,24 @@ class GraphSearch:
         node: TripNode
     ):
 
-        results = await ChargingPlanner.plan(
-            node.trip
+        search_state = BatteryStateService.first_below_soc(
+
+            node.trip.battery_states,
+
+            node.trip.planning.minimum_charger_arrival_soc
+
+        )
+
+        if search_state is None:
+
+            return []
+
+        results = await ChargingPlanner.plan_next_hop(
+
+            trip=node.trip,
+
+            search_state=search_state
+
         )
 
         children = []
@@ -63,7 +82,9 @@ class GraphSearch:
 
                     itinerary=itinerary,
 
-                    depth=node.depth + 1
+                    depth=node.depth + 1,
+
+                    parent=node
 
                 )
 
