@@ -78,21 +78,14 @@ class JourneyBuilder:
 
             )
 
-            journey.total_driving_minutes += (
-
-                itinerary.total_driving_minutes
-
-            )
+            #
+            # Driving time is already included in the
+            # candidate's total trip time.
+            #
 
             journey.total_charging_minutes += (
 
                 itinerary.total_charging_minutes
-
-            )
-
-            journey.total_detour_minutes += (
-
-                itinerary.total_detour_minutes
 
             )
 
@@ -102,10 +95,6 @@ class JourneyBuilder:
 
             )
 
-            #
-            # Count charging stops.
-            #
-
             journey.total_stops += (
 
                 itinerary.stops
@@ -113,16 +102,14 @@ class JourneyBuilder:
             )
 
             #
-            # Carry the SOC into the next leg.
+            # Carry the actual simulated destination SOC.
             #
 
             if itinerary.legs:
 
-                last_leg = itinerary.legs[-1]
-
                 current_soc = (
 
-                    last_leg.selected_result.destination_soc
+                    itinerary.destination_soc
 
                 )
 

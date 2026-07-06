@@ -5,6 +5,10 @@ from backend.services.adapters.geocoding_service import GeocodingService
 from backend.services.adapters.routing_service import RoutingService
 from backend.services.adapters.weather_service import WeatherService
 
+from backend.services.planning.route_cache import (
+    RouteCache,
+)
+
 from backend.services.planning.route_weather_service import (
     RouteWeatherService,
 )
@@ -276,18 +280,44 @@ class TripBuilder:
         charger
     ):
 
+        start = [
+
+            charger.longitude,
+
+            charger.latitude
+
+        ]
+
         destination = trip.route.geometry[-1]
 
-        return await RoutingService.get_route(
+        cached = RouteCache.get(
 
-            [
-
-                charger.longitude,
-
-                charger.latitude
-
-            ],
+            start,
 
             destination
 
         )
+
+        if cached is not None:
+
+            return cached
+
+        route = await RoutingService.get_route(
+
+            start,
+
+            destination
+
+        )
+
+        RouteCache.set(
+
+            start,
+
+            destination,
+
+            route
+
+        )
+
+        return route

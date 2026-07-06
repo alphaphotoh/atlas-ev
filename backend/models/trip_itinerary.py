@@ -10,11 +10,7 @@ class TripItinerary:
         default_factory=list
     )
 
-    total_driving_minutes: float = 0.0
-
     total_charging_minutes: float = 0.0
-
-    total_detour_minutes: float = 0.0
 
     total_trip_minutes: float = 0.0
 
@@ -44,33 +40,19 @@ class TripItinerary:
         return (
             self.last_leg
             .selected_result
-            .destination_soc
+            .destination_arrival_soc
         )
 
     @property
     def completed(self) -> bool:
-
-        return (
-
-            self.last_leg is not None
-
-            and
-
-            not self.last_leg.selected_result.requires_additional_stop
-
-        )
-
-    @property
-    def requires_additional_stop(self) -> bool:
 
         if not self.last_leg:
 
             return False
 
         return (
-            self.last_leg
-            .selected_result
-            .requires_additional_stop
+            self.destination_soc >=
+            25.0
         )
 
     def add_leg(
@@ -86,14 +68,6 @@ class TripItinerary:
 
     def recalculate(self):
 
-        self.total_driving_minutes = sum(
-
-            leg.selected_result.driving_time_minutes
-
-            for leg in self.legs
-
-        )
-
         self.total_charging_minutes = sum(
 
             leg.selected_result.charging_time_minutes
@@ -102,20 +76,10 @@ class TripItinerary:
 
         )
 
-        self.total_detour_minutes = sum(
+        self.total_trip_minutes = sum(
 
-            leg.selected_result.detour_time_minutes
+            leg.selected_result.total_trip_time_minutes
 
             for leg in self.legs
-
-        )
-
-        self.total_trip_minutes = (
-
-            self.total_driving_minutes +
-
-            self.total_charging_minutes +
-
-            self.total_detour_minutes
 
         )

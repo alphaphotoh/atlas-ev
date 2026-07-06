@@ -14,10 +14,9 @@ from backend.services.simulation.charging_time_service import (
 class CandidateBuilder:
 
     @staticmethod
-    def build(
+    async def build(
         trip,
-        charger,
-        search_state
+        charger
     ):
 
         projected = ProjectionService.project(
@@ -34,33 +33,7 @@ class CandidateBuilder:
 
         )
 
-        print()
-
-        print("=" * 60)
-
-        print(f"Charger: {projected.name}")
-
-        print(
-            f"Projected route distance: "
-            f"{projected.route_distance_km:.1f} km"
-        )
-
-        print(
-            f"Search state distance: "
-            f"{search_state.distance_km:.1f} km"
-        )
-
-        print(
-            f"Detour: "
-            f"{projected.detour_distance_km:.2f} km"
-        )
-
-        print(
-            f"Arrival SOC: "
-            f"{arrival_state.soc:.1f}%"
-        )
-
-        departure_soc = DepartureOptimizer.optimize(
+        departure_soc, next_trip = await DepartureOptimizer.optimize(
 
             trip=trip,
 
@@ -68,11 +41,6 @@ class CandidateBuilder:
 
             arrival_soc=arrival_state.soc
 
-        )
-
-        print(
-            f"Departure SOC: "
-            f"{departure_soc:.1f}%"
         )
 
         energy_added, charging_time = (
@@ -91,40 +59,36 @@ class CandidateBuilder:
 
         )
 
-        print(
-            f"Charge added: "
-            f"{energy_added:.1f} kWh"
-        )
+        return (
 
-        print(
-            f"Charging time: "
-            f"{charging_time:.1f} min"
-        )
+            ChargingCandidate(
 
-        return ChargingCandidate(
+                charger=projected,
 
-            charger=projected,
+                battery_state=arrival_state,
 
-            battery_state=arrival_state,
+                arrival_soc=arrival_state.soc,
 
-            arrival_soc=arrival_state.soc,
+                departure_soc=departure_soc,
 
-            departure_soc=departure_soc,
+                destination_arrival_soc=0.0,
 
-            destination_arrival_soc=0.0,
+                charge_added_kwh=energy_added,
 
-            charge_added_kwh=energy_added,
+                charging_time_minutes=charging_time,
 
-            charging_time_minutes=charging_time,
+                total_trip_time_minutes=(
 
-            total_trip_time_minutes=(
+                    trip.route.duration_minutes +
 
-                trip.route.duration_minutes +
+                    charging_time
 
-                charging_time
+                ),
+
+                score=0.0
 
             ),
 
-            score=0.0
+            next_trip
 
         )

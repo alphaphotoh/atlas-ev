@@ -30,8 +30,6 @@ class GraphOptimizer:
 
                 node.itinerary.total_charging_minutes,
 
-                node.itinerary.total_detour_minutes,
-
                 node.depth
 
             )

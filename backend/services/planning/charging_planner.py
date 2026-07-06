@@ -2,7 +2,6 @@ from backend.services.planning.candidate_builder import CandidateBuilder
 from backend.services.planning.corridor_service import CorridorService
 from backend.services.planning.result_printer import ResultPrinter
 from backend.services.planning.optimizer.trip_optimizer import TripOptimizer
-from backend.services.planning.trip_simulator import TripSimulator
 from backend.services.planning.scoring_service import ScoringService
 from backend.services.planning.search_window_service import (
     SearchWindowService,
@@ -63,10 +62,6 @@ class ChargingPlanner:
         chargers=None
     ):
 
-        #
-        # Search only around the depletion point.
-        #
-
         if chargers is None:
 
             window = SearchWindowService.build(
@@ -87,7 +82,7 @@ class ChargingPlanner:
 
             )
 
-        results = ChargingPlanner.plan_from_state(
+        candidates = ChargingPlanner.plan_from_state(
 
             trip=trip,
 
@@ -98,12 +93,10 @@ class ChargingPlanner:
         )
 
         ResultPrinter.print(
-
-            results
-
+            candidates
         )
 
-        return results
+        return candidates
 
     @staticmethod
     def plan_from_state(
@@ -112,7 +105,7 @@ class ChargingPlanner:
         chargers
     ):
 
-        trip.results = []
+        candidates = []
 
         for charger in chargers:
 
@@ -121,8 +114,6 @@ class ChargingPlanner:
                 trip=trip,
 
                 charger=charger,
-
-                search_state=search_state
 
             )
 
@@ -136,51 +127,19 @@ class ChargingPlanner:
 
                 continue
 
-            result = TripSimulator.simulate(
+            candidate.score = ScoringService.score(
+                candidate,
 
-                trip,
+                trip.planning
+            )
 
+            candidates.append(
                 candidate
-
             )
-
-            result.candidate.destination_arrival_soc = (
-
-                result.destination_soc
-
-            )
-
-            result.candidate.score = (
-
-                ScoringService.score(
-
-                    result.candidate
-
-                )
-
-            )
-
-            trip.results.append(
-
-                result
-
-            )
-
-        trip.results.sort(
-
-            key=lambda result: (
-
-                -result.candidate.score,
-
-                result.total_trip_time_minutes
-
-            )
-
-        )
 
         return TripOptimizer.optimize(
 
-            trip.results,
+            candidates,
 
             limit=10
 

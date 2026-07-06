@@ -20,7 +20,7 @@ class ChargerService:
             "longitude": longitude,
             "distance": distance_km,
             "distanceunit": "KM",
-            "maxresults": 20
+            "maxresults": 100
         }
 
         response = await HttpClient.get(

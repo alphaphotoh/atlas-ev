@@ -1,14 +1,12 @@
 class ResultPrinter:
 
     @staticmethod
-    def print(results):
+    def print(candidates):
 
         print()
         print("========== BEST TRIPS ==========")
 
-        for result in results:
-
-            candidate = result.candidate
+        for candidate in candidates:
 
             print()
             print("=" * 50)
@@ -49,28 +47,13 @@ class ResultPrinter:
             )
 
             print(
-                f"Requires Another Stop: "
-                f"{'YES' if result.requires_additional_stop else 'NO'}"
-            )
-
-            print(
                 f"Charging Time: "
                 f"{candidate.charging_time_minutes:.1f} min"
             )
 
             print(
-                f"Driving Time: "
-                f"{result.driving_time_minutes:.1f} min"
-            )
-
-            print(
-                f"Detour Time: "
-                f"{result.detour_time_minutes:.1f} min"
-            )
-
-            print(
                 f"Total Trip Time: "
-                f"{result.total_trip_time_minutes:.1f} min"
+                f"{candidate.total_trip_time_minutes:.1f} min"
             )
 
             print(

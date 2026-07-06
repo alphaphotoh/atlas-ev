@@ -1,25 +1,22 @@
+from backend.services.planning.trip_builder import (
+    TripBuilder,
+)
+
+
 class DepartureOptimizer:
 
     @staticmethod
-    def optimize(
+    async def optimize(
         trip,
         charger,
         arrival_soc
     ):
 
-        required_soc = DepartureOptimizer.required_soc(
-
-            trip,
-
-            charger
-
-        )
-
         departure_soc = max(
 
-            required_soc,
+            arrival_soc,
 
-            arrival_soc
+            trip.planning.ideal_charger_arrival_soc_min
 
         )
 
@@ -31,50 +28,54 @@ class DepartureOptimizer:
 
         )
 
-        return round(
+        while True:
 
-            departure_soc,
+            next_trip = await TripBuilder.build(
 
-            1
+                trip=trip,
 
-        )
+                charger=charger,
 
-    @staticmethod
-    def required_soc(
-        trip,
-        charger
-    ):
+                departure_soc=departure_soc
 
-        remaining_distance = (
+            )
 
-            trip.route.distance_km -
+            destination_soc = (
 
-            charger.route_distance_km
+                next_trip.battery_states[-1].soc
 
-        )
+            )
 
-        energy_needed = (
+            if (
 
-            remaining_distance *
+                destination_soc >=
 
-            trip.simulation.predicted_efficiency /
+                trip.planning.target_destination_soc
 
-            100
+            ):
 
-        )
+                return (
 
-        soc_needed = (
+                    round(departure_soc, 1),
 
-            energy_needed /
+                    next_trip
 
-            trip.vehicle.usable_battery_kwh
+                )
 
-        ) * 100
+            departure_soc += 1.0
 
-        return (
+            if (
 
-            soc_needed +
+                departure_soc >
 
-            trip.planning.target_destination_soc
+                trip.planning.road_trip_charge_limit
 
-        )
+            ):
+
+                return (
+
+                    trip.planning.road_trip_charge_limit,
+
+                    next_trip
+
+                )

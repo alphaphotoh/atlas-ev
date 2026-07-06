@@ -2,28 +2,28 @@ class TripOptimizer:
 
     @staticmethod
     def optimize(
-        results,
+        candidates,
         limit=10
     ):
 
-        if not results:
+        if not candidates:
 
             return []
 
-        results.sort(
+        candidates.sort(
 
-    key=lambda result: (
+            key=lambda candidate: (
 
-        -result.candidate.score,
+                -candidate.score,
 
-        result.total_trip_time_minutes,
+                candidate.total_trip_time_minutes,
 
-        result.candidate.charger.detour_distance_km,
+                candidate.charger.detour_distance_km,
 
-        -result.destination_soc
+                -candidate.destination_arrival_soc
+
+            )
 
         )
 
-    )
-
-        return results[:limit]
+        return candidates[:limit]

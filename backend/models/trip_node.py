@@ -13,6 +13,10 @@ class TripNode:
         default_factory=TripItinerary
     )
 
+    visited_chargers: set[int] = field(
+    default_factory=set
+    )
+
     depth: int = 0
 
     parent: "TripNode | None" = None

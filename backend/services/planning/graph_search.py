@@ -2,21 +2,14 @@ from backend.models.trip_node import TripNode
 from backend.models.trip_itinerary import TripItinerary
 from backend.models.trip_leg import TripLeg
 
-from backend.services.planning.charging_planner import ChargingPlanner
-from backend.services.planning.trip_builder import TripBuilder
-from backend.services.planning.projection_service import ProjectionService
+from backend.services.planning.candidate_builder import CandidateBuilder
+from backend.services.planning.scoring_service import ScoringService
 from backend.services.simulation.battery_state_service import (
     BatteryStateService,
 )
 
 
 class GraphSearch:
-
-    #
-    # Only consider chargers a little beyond the point
-    # where the battery reaches the minimum arrival SOC.
-    #
-    SEARCH_MARGIN_KM = 30
 
     @staticmethod
     async def expand(
@@ -33,62 +26,71 @@ class GraphSearch:
 
         if search_state is None:
 
-            print()
-            print("No search state found.")
-
             return []
 
-        #
-        # Load corridor chargers once.
-        #
-
-        results = await ChargingPlanner.plan_next_hop(
-
-            trip=node.trip,
-
-            search_state=search_state
-
-        )
-
-        #
-        # Filter to chargers that are realistically reachable
-        # from the current node.
-        #
-
-        reachable_results = []
-
-        max_distance = (
-
-            search_state.distance_km +
-
-            GraphSearch.SEARCH_MARGIN_KM
-
-        )
-
-        for result in results:
-
-            projected = ProjectionService.project(
-
-                node.trip.route,
-
-                result.candidate.charger
-
-            )
-
-            if projected.route_distance_km <= max_distance:
-
-                reachable_results.append(result)
-
-        print()
-
-        print(
-            f"Reachable candidates: "
-            f"{len(reachable_results)} / {len(results)}"
-        )
+        chargers = node.trip.corridor_chargers
 
         children = []
 
-        for result in reachable_results:
+        for charger in chargers:
+
+            candidate, next_trip = await CandidateBuilder.build(
+
+                trip=node.trip,
+
+                charger=charger
+
+            )
+
+            if (
+
+                candidate.arrival_soc <
+
+                node.trip.planning.minimum_charger_arrival_soc
+
+            ):
+
+                continue
+
+            charger = candidate.charger
+
+            charger_id = getattr(
+
+                charger,
+
+                "id",
+
+                None
+
+            )
+
+            if charger_id is None:
+
+                charger_id = (
+
+                    round(charger.latitude, 6),
+
+                    round(charger.longitude, 6)
+
+                )
+
+            if charger_id in node.visited_chargers:
+
+                continue
+
+            candidate.destination_arrival_soc = (
+
+                next_trip.battery_states[-1].soc
+
+            )
+
+            candidate.score = ScoringService.score(
+
+                candidate,
+
+                node.trip.planning
+
+            )
 
             itinerary = TripItinerary()
 
@@ -108,21 +110,23 @@ class GraphSearch:
 
                     battery_states=node.trip.battery_states,
 
-                    results=reachable_results,
+                    results=[],
 
-                    selected_result=result
+                    selected_result=candidate
 
                 )
 
             )
 
-            next_trip = await TripBuilder.build(
+            visited = set(
 
-                trip=node.trip,
+                node.visited_chargers
 
-                charger=result.candidate.charger,
+            )
 
-                departure_soc=result.candidate.departure_soc
+            visited.add(
+
+                charger_id
 
             )
 
@@ -138,7 +142,15 @@ class GraphSearch:
 
                     parent=node,
 
-                    g_cost=itinerary.total_trip_minutes,
+                    visited_chargers=visited,
+
+                    g_cost=(
+
+                        node.g_cost +
+
+                        candidate.total_trip_time_minutes
+
+                    ),
 
                     h_cost=0.0
 
@@ -146,8 +158,22 @@ class GraphSearch:
 
             )
 
+        children.sort(
+
+            key=lambda child: (
+
+                -child.itinerary.last_leg.selected_result.score,
+
+                child.g_cost
+
+            )
+
+        )
+
+        print()
+
         print(
-            f"Generated {len(children)} child node(s)."
+            f"Children created: {len(children)}"
         )
 
         return children

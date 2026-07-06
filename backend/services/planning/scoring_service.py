@@ -1,60 +1,105 @@
 class ScoringService:
 
-    IDEAL_CHARGER_ARRIVAL_SOC = 27.5
-    IDEAL_DESTINATION_SOC = 25.0
-
     @staticmethod
-    def score(candidate):
+    def score(candidate, planning):
 
         score = 1000
 
-        # Prefer shorter charging sessions
-        score -= candidate.charging_time_minutes * 6
+        #
+        # Prefer shorter charging sessions.
+        #
+        score -= (
+            candidate.charging_time_minutes * 6
+        )
 
-        # Prefer smaller detours
+        #
+        # Prefer smaller detours.
+        #
         score -= (
             candidate.charger.detour_distance_km * 20
         )
 
-        # Prefer higher-power chargers
+        #
+        # Prefer higher-power chargers.
+        #
         if candidate.charger.power_kw:
 
             score += min(
+
                 candidate.charger.power_kw,
+
                 350
+
             ) / 2
 
-        # Strongly prefer arriving at chargers around 25-30%
-        arrival_difference = abs(
-            candidate.arrival_soc -
-            ScoringService.IDEAL_CHARGER_ARRIVAL_SOC
+        #
+        # Arrival SOC scoring.
+        #
+
+        arrival_soc = (
+            candidate.arrival_soc
         )
 
-        score -= arrival_difference * 8
+        ideal_min = (
+            planning.ideal_charger_arrival_soc_min
+        )
 
-        # Heavy penalty for arriving below 25%
-        if candidate.arrival_soc < 25:
+        ideal_max = (
+            planning.ideal_charger_arrival_soc_max
+        )
+
+        if arrival_soc < ideal_min:
 
             score -= (
-                (25 - candidate.arrival_soc) * 15
+                (ideal_min - arrival_soc) * 6
             )
 
-        # Prefer arriving at destination around 25%
-        destination_difference = abs(
-            candidate.destination_arrival_soc -
-            ScoringService.IDEAL_DESTINATION_SOC
-        )
-
-        score -= destination_difference * 4
-
-        # Heavy penalty if destination SOC is below 25%
-        if candidate.destination_arrival_soc < 25:
+        elif arrival_soc > ideal_max:
 
             score -= (
-                (25 - candidate.destination_arrival_soc) * 20
+                (arrival_soc - ideal_max) * 4
+            )
+
+        #
+        # Destination SOC.
+        #
+
+        destination_difference = abs(
+
+            candidate.destination_arrival_soc -
+
+            planning.target_destination_soc
+
+        )
+
+        score -= (
+            destination_difference * 3
+        )
+
+        if (
+
+            candidate.destination_arrival_soc <
+
+            planning.target_destination_soc
+
+        ):
+
+            score -= (
+
+                (
+
+                    planning.target_destination_soc -
+
+                    candidate.destination_arrival_soc
+
+                ) * 10
+
             )
 
         return round(
+
             score,
+
             2
+
         )
