@@ -8,8 +8,9 @@ from backend.models.battery_state import BatteryState
 from backend.models.charging_candidate import ChargingCandidate
 from backend.models.simulation_result import SimulationResult
 from backend.models.trip_leg import TripLeg
-from backend.models.weather_sample import WeatherSample
+from backend.models.environment_sample import EnvironmentSample
 from backend.models.efficiency_sample import EfficiencySample
+from backend.models.trip_waypoint import TripWaypoint
 
 
 @dataclass
@@ -33,11 +34,15 @@ class TripPlan:
         default_factory=list
     )
 
-    weather_samples: list[WeatherSample] = field(
+    environment_samples: list[EnvironmentSample] = field(
         default_factory=list
     )
 
     efficiency_profile: list[EfficiencySample] = field(
+        default_factory=list
+    )
+
+    waypoints: list[TripWaypoint] = field(
         default_factory=list
     )
 

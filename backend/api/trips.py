@@ -19,6 +19,8 @@ async def plan_trip(request: TripRequest):
 
         origin=request.origin,
 
+        waypoints=request.waypoints,
+
         destination=request.destination,
 
         starting_soc=request.starting_soc,

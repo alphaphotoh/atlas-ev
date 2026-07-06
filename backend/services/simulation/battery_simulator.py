@@ -28,11 +28,11 @@ class BatterySimulator:
 
         for segment in route.segments:
 
-            current_efficiency = efficiency
+            segment_efficiency = efficiency
 
             if efficiency_profile:
 
-                current_efficiency = min(
+                closest = min(
 
                     efficiency_profile,
 
@@ -44,11 +44,17 @@ class BatterySimulator:
 
                     )
 
-                ).efficiency
+                )
+
+                segment_efficiency = (
+
+                    closest.efficiency
+
+                )
 
             energy_per_km = (
 
-                current_efficiency / 100
+                segment_efficiency / 100
 
             )
 
@@ -60,37 +66,6 @@ class BatterySimulator:
 
             )
 
-            if segment.index < 5:
-
-                print()
-
-                print(f"Segment {segment.index}")
-
-                print(
-                    f"Distance: "
-                    f"{segment.cumulative_distance_km:.1f} km"
-                )
-
-                print(
-                    f"Efficiency: "
-                    f"{current_efficiency:.2f} kWh/100km"
-                )
-
-                print(
-                    f"Length: "
-                    f"{segment.length_km:.3f} km"
-                )
-
-                print(
-                    f"Energy Used: "
-                    f"{energy:.3f} kWh"
-                )
-
-                print(
-                    f"Remaining Before: "
-                    f"{remaining_energy:.3f} kWh"
-                )
-
             remaining_energy -= energy
 
             remaining_energy = max(
@@ -100,13 +75,6 @@ class BatterySimulator:
                 0
 
             )
-
-            if segment.index < 5:
-
-                print(
-                    f"Remaining After: "
-                    f"{remaining_energy:.3f} kWh"
-                )
 
             elapsed_minutes += (
 
@@ -136,6 +104,43 @@ class BatterySimulator:
 
             if segment.index < 5:
 
+                print()
+
+                print(
+                    f"Segment {segment.index}"
+                )
+
+                print(
+                    f"Distance: "
+                    f"{segment.cumulative_distance_km:.1f} km"
+                )
+
+                print(
+                    f"Efficiency: "
+                    f"{segment_efficiency:.2f} "
+                    f"kWh/100km"
+                )
+
+                print(
+                    f"Length: "
+                    f"{segment.length_km:.3f} km"
+                )
+
+                print(
+                    f"Energy Used: "
+                    f"{energy:.3f} kWh"
+                )
+
+                print(
+                    f"Remaining Before: "
+                    f"{remaining_energy + energy:.3f} kWh"
+                )
+
+                print(
+                    f"Remaining After: "
+                    f"{remaining_energy:.3f} kWh"
+                )
+
                 print(
                     f"SOC: "
                     f"{soc:.2f}%"
@@ -155,7 +160,7 @@ class BatterySimulator:
 
                     remaining_energy_kwh=remaining_energy,
 
-                    efficiency_kwh_per_100km=current_efficiency,
+                    efficiency_kwh_per_100km=segment_efficiency,
 
                     speed_kmh=speed,
 

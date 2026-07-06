@@ -4,12 +4,19 @@ from backend.models.trip_leg import TripLeg
 
 from backend.services.planning.charging_planner import ChargingPlanner
 from backend.services.planning.trip_builder import TripBuilder
+from backend.services.planning.projection_service import ProjectionService
 from backend.services.simulation.battery_state_service import (
     BatteryStateService,
 )
 
 
 class GraphSearch:
+
+    #
+    # Only consider chargers a little beyond the point
+    # where the battery reaches the minimum arrival SOC.
+    #
+    SEARCH_MARGIN_KM = 30
 
     @staticmethod
     async def expand(
@@ -26,26 +33,69 @@ class GraphSearch:
 
         if search_state is None:
 
+            print()
+            print("No search state found.")
+
             return []
+
+        #
+        # Load corridor chargers once.
+        #
 
         results = await ChargingPlanner.plan_next_hop(
 
             trip=node.trip,
 
-            search_state=search_state,
+            search_state=search_state
 
-            chargers=node.trip.corridor_chargers
+        )
 
+        #
+        # Filter to chargers that are realistically reachable
+        # from the current node.
+        #
+
+        reachable_results = []
+
+        max_distance = (
+
+            search_state.distance_km +
+
+            GraphSearch.SEARCH_MARGIN_KM
+
+        )
+
+        for result in results:
+
+            projected = ProjectionService.project(
+
+                node.trip.route,
+
+                result.candidate.charger
+
+            )
+
+            if projected.route_distance_km <= max_distance:
+
+                reachable_results.append(result)
+
+        print()
+
+        print(
+            f"Reachable candidates: "
+            f"{len(reachable_results)} / {len(results)}"
         )
 
         children = []
 
-        for result in results:
+        for result in reachable_results:
 
             itinerary = TripItinerary()
 
             itinerary.legs.extend(
+
                 node.itinerary.legs
+
             )
 
             itinerary.add_leg(
@@ -58,7 +108,7 @@ class GraphSearch:
 
                     battery_states=node.trip.battery_states,
 
-                    results=results,
+                    results=reachable_results,
 
                     selected_result=result
 
@@ -95,5 +145,9 @@ class GraphSearch:
                 )
 
             )
+
+        print(
+            f"Generated {len(children)} child node(s)."
+        )
 
         return children

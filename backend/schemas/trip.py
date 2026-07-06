@@ -9,6 +9,8 @@ class TripRequest(BaseModel):
 
     destination: str
 
+    waypoints: list[str] = []
+
     starting_soc: float
 
     average_speed: float = 110

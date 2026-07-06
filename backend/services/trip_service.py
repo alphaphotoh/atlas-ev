@@ -1,21 +1,19 @@
 from backend.models.registry import VehicleRegistry
-from backend.models.trip_plan import TripPlan
-from backend.models.simulation_context import SimulationContext
 
-from backend.services.adapters.geocoding_service import GeocodingService
-from backend.services.adapters.routing_service import RoutingService
-from backend.services.adapters.weather_service import WeatherService
-
-from backend.services.simulation.energy_service import EnergyService
-from backend.services.simulation.battery_service import BatteryService
-from backend.services.simulation.battery_simulator import BatterySimulator
-from backend.services.simulation.efficiency_profile_service import (
-    EfficiencyProfileService,
+from backend.services.planning.trip_builder import (
+    TripBuilder,
 )
 
-from backend.services.planning.trip_expander import TripExpander
-from backend.services.planning.route_weather_service import (
-    RouteWeatherService,
+from backend.services.planning.trip_expander import (
+    TripExpander,
+)
+
+from backend.services.planning.waypoint_service import (
+    WaypointService,
+)
+
+from backend.services.planning.journey_builder import (
+    JourneyBuilder,
 )
 
 
@@ -25,6 +23,7 @@ class TripService:
     async def build_trip(
         vehicle_id: str,
         origin: str,
+        waypoints: list[str],
         destination: str,
         starting_soc: float,
         average_speed: float,
@@ -33,125 +32,135 @@ class TripService:
 
         vehicle = VehicleRegistry.get(vehicle_id)
 
-        origin_data = await GeocodingService.search(origin)
-        destination_data = await GeocodingService.search(destination)
+        trip_waypoints = WaypointService.build(
 
-        origin_coords = (
-            origin_data["features"][0]["geometry"]["coordinates"]
-        )
+            origin=origin,
 
-        destination_coords = (
-            destination_data["features"][0]["geometry"]["coordinates"]
-        )
+            waypoints=waypoints,
 
-        weather = await WeatherService.get_weather(
-
-            latitude=origin_coords[1],
-
-            longitude=origin_coords[0]
+            destination=destination
 
         )
 
-        route = await RoutingService.get_route(
+        #
+        # Multi-leg trip
+        #
+        if len(trip_waypoints) > 1:
 
-            origin_coords,
+            journey = await JourneyBuilder.build(
 
-            destination_coords
+                vehicle=vehicle,
 
-        )
+                waypoints=trip_waypoints,
 
-        trip = TripPlan(
+                starting_soc=starting_soc,
+
+                average_speed=average_speed,
+
+                highway_ratio=highway_ratio
+
+            )
+
+            return {
+
+                "vehicle": vehicle.name,
+
+                "origin": origin,
+
+                "destination": destination,
+
+                "waypoints": waypoints,
+
+                "legs": [
+
+                    {
+
+                        "origin": waypoint.origin,
+
+                        "destination": waypoint.destination,
+
+                        "distance_km": round(
+                            trip.route.distance_km,
+                            1
+                        ),
+
+                        "duration_minutes": round(
+                            trip.route.duration_minutes
+                        ),
+
+                        "arrival_soc": round(
+                            trip.simulation.arrival_soc,
+                            1
+                        )
+
+                    }
+
+                    for waypoint, trip in zip(
+
+                        trip_waypoints,
+
+                        journey.trips
+
+                    )
+
+                ],
+
+                "summary": {
+
+                    "distance_km": round(
+
+                        journey.total_distance_km,
+
+                        1
+
+                    ),
+
+                    "duration_minutes": round(
+
+                        journey.total_duration_minutes
+
+                    ),
+
+                    "energy_kwh": round(
+
+                        journey.total_energy_kwh,
+
+                        1
+
+                    ),
+
+                    "arrival_soc": round(
+
+                        journey.arrival_soc,
+
+                        1
+
+                    )
+
+                }
+
+            }
+
+        trip = await TripBuilder.build_trip(
 
             vehicle=vehicle,
 
-            route=route
+            origin=origin,
 
-        )
-
-        trip.weather_samples = (
-
-            await RouteWeatherService.sample(
-
-                route
-
-            )
-
-        )
-
-        predicted_efficiency = EnergyService.predict_efficiency(
-
-            temperature=weather.temperature_c,
-
-            average_speed=average_speed,
-
-            highway_ratio=highway_ratio
-
-        )
-
-        trip.efficiency_profile = (
-
-            EfficiencyProfileService.build(
-
-                route=route,
-
-                weather_samples=trip.weather_samples,
-
-                base_efficiency=predicted_efficiency
-
-            )
-
-        )
-
-        trip.battery_states = BatterySimulator.simulate(
-
-            route=trip.route,
+            destination=destination,
 
             starting_soc=starting_soc,
 
-            usable_battery_kwh=vehicle.usable_battery_kwh,
-
-            efficiency=predicted_efficiency,
-
-            efficiency_profile=trip.efficiency_profile
-
-        )
-
-        energy_needed = EnergyService.estimate_energy_needed(
-
-            distance_km=trip.route.distance_km,
-
-            efficiency=predicted_efficiency
-
-        )
-
-        arrival_soc = BatteryService.estimate_arrival_soc(
-
-            starting_soc=starting_soc,
-
-            usable_battery=vehicle.usable_battery_kwh,
-
-            energy_used=energy_needed
-
-        )
-
-        trip.simulation = SimulationContext(
-
-            predicted_efficiency=predicted_efficiency,
-
-            energy_needed_kwh=energy_needed,
-
-            arrival_soc=arrival_soc,
-
             average_speed=average_speed,
-
-            temperature=weather.temperature_c,
 
             highway_ratio=highway_ratio
 
         )
 
         itinerary = await TripExpander.expand(
+
             trip
+
         )
 
         return {
@@ -160,23 +169,25 @@ class TripService:
 
             "origin": origin,
 
+            "waypoints": waypoints,
+
             "destination": destination,
 
             "weather": {
 
-                "temperature_c": weather.temperature_c,
+                "temperature_c": trip.environment_samples[0].weather.temperature_c,
 
-                "wind_speed_kph": weather.wind_speed_kph,
+                "wind_speed_kph": trip.environment_samples[0].weather.wind_speed_kph,
 
-                "wind_direction_degrees": weather.wind_direction_degrees,
+                "wind_direction_degrees": trip.environment_samples[0].weather.wind_direction_degrees,
 
-                "humidity_percent": weather.humidity_percent,
+                "humidity_percent": trip.environment_samples[0].weather.humidity_percent,
 
-                "pressure_hpa": weather.pressure_hpa,
+                "pressure_hpa": trip.environment_samples[0].weather.pressure_hpa,
 
-                "precipitation_mm": weather.precipitation_mm,
+                "precipitation_mm": trip.environment_samples[0].weather.precipitation_mm,
 
-                "snowfall_cm": weather.snowfall_cm
+                "snowfall_cm": trip.environment_samples[0].weather.snowfall_cm
 
             },
 
@@ -184,7 +195,10 @@ class TripService:
 
                 {
 
-                    "distance_km": sample.route_distance_km,
+                    "distance_km": round(
+                        sample.route_distance_km,
+                        1
+                    ),
 
                     "temperature_c": sample.weather.temperature_c,
 
@@ -194,11 +208,18 @@ class TripService:
 
                     "precipitation_mm": sample.weather.precipitation_mm,
 
-                    "snowfall_cm": sample.weather.snowfall_cm
+                    "snowfall_cm": sample.weather.snowfall_cm,
+
+                    "elevation_m": sample.elevation_m,
+
+                    "grade_percent": round(
+                        sample.grade_percent,
+                        2
+                    )
 
                 }
 
-                for sample in trip.weather_samples
+                for sample in trip.environment_samples
 
             ],
 
@@ -206,7 +227,10 @@ class TripService:
 
                 {
 
-                    "distance_km": sample.distance_km,
+                    "distance_km": round(
+                        sample.distance_km,
+                        1
+                    ),
 
                     "efficiency": sample.efficiency
 

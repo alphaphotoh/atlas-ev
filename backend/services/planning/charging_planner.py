@@ -4,6 +4,9 @@ from backend.services.planning.result_printer import ResultPrinter
 from backend.services.planning.optimizer.trip_optimizer import TripOptimizer
 from backend.services.planning.trip_simulator import TripSimulator
 from backend.services.planning.scoring_service import ScoringService
+from backend.services.planning.search_window_service import (
+    SearchWindowService,
+)
 from backend.services.simulation.battery_state_service import (
     BatteryStateService,
 )
@@ -25,7 +28,6 @@ class ChargingPlanner:
         if search_state is None:
 
             print()
-
             print(
                 "Trip can be completed without charging."
             )
@@ -61,25 +63,29 @@ class ChargingPlanner:
         chargers=None
     ):
 
+        #
+        # Search only around the depletion point.
+        #
+
         if chargers is None:
 
-            if trip.corridor_chargers:
+            window = SearchWindowService.build(
 
-                chargers = (
-                    trip.corridor_chargers
-                )
+                trip.route,
 
-            else:
+                search_state
 
-                chargers = await CorridorService.find_chargers(
+            )
 
-                    trip
+            chargers = await CorridorService.find_chargers_in_window(
 
-                )
+                route=trip.route,
 
-                trip.corridor_chargers = (
-                    chargers
-                )
+                window=window,
+
+                trip=trip
+
+            )
 
         results = ChargingPlanner.plan_from_state(
 
@@ -137,16 +143,6 @@ class ChargingPlanner:
                 candidate
 
             )
-
-            if (
-
-                result.destination_soc <
-
-                trip.planning.target_destination_soc
-
-            ):
-
-                continue
 
             result.candidate.destination_arrival_soc = (
 

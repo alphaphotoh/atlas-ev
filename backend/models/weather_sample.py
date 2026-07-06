@@ -1,15 +1,12 @@
 from dataclasses import dataclass
 
+from backend.models.environment_sample import (
+    EnvironmentSample,
+)
 from backend.models.weather import Weather
 
 
 @dataclass
-class WeatherSample:
-
-    route_distance_km: float
-
-    latitude: float
-
-    longitude: float
+class WeatherSample(EnvironmentSample):
 
     weather: Weather
