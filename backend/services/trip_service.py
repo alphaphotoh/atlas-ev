@@ -85,6 +85,7 @@ class TripService:
         route_legs = []
         charging_stops = []
         alternative_plans = []
+        alternative_plan_groups = []
 
         stop_number = 1
 
@@ -118,6 +119,16 @@ class TripService:
             alternative_plans.extend(
                 leg_alternatives
             )
+
+            if leg_alternatives:
+                alternative_plan_groups.append(
+                    TripService.build_alternative_plan_group(
+                        route_leg_number=index + 1,
+                        origin=waypoint.origin,
+                        destination=waypoint.destination,
+                        plans=leg_alternatives
+                    )
+                )
 
             arrival_soc_without_charging = TripService.actual_arrival_soc(
                 trip
@@ -205,6 +216,7 @@ class TripService:
                 "scope": "per_route_leg",
                 "plans": alternative_plans
             },
+            "alternative_plans_by_leg": alternative_plan_groups,
             "summary": {
                 "distance_km": TripService.round_value(
                     journey.total_distance_km,
@@ -283,6 +295,18 @@ class TripService:
             original_trip=trip
         )
 
+        alternative_plan_groups = []
+
+        if alternative_plans:
+            alternative_plan_groups.append(
+                TripService.build_alternative_plan_group(
+                    route_leg_number=1,
+                    origin=origin,
+                    destination=destination,
+                    plans=alternative_plans
+                )
+            )
+
         return {
             "vehicle": trip.vehicle.name,
             "origin": origin,
@@ -346,6 +370,7 @@ class TripService:
                 "scope": "single_route",
                 "plans": alternative_plans
             },
+            "alternative_plans_by_leg": alternative_plan_groups,
             "summary": {
                 "distance_km": TripService.round_value(
                     trip.route.distance_km,
@@ -391,6 +416,32 @@ class TripService:
         }
 
     @staticmethod
+    def build_alternative_plan_group(
+        route_leg_number,
+        origin,
+        destination,
+        plans
+    ):
+        return {
+            "route_leg": route_leg_number,
+            "origin": origin,
+            "destination": destination,
+            "available": len(plans) > 1,
+            "recommended_plan_id": TripService.recommended_plan_id(
+                plans
+            ),
+            "plans": plans
+        }
+
+    @staticmethod
+    def recommended_plan_id(plans):
+        for plan in plans:
+            if plan.get("is_recommended"):
+                return plan.get("plan_id")
+
+        return None
+
+    @staticmethod
     def build_alternative_plans(
         planning_result,
         route_leg_number,
@@ -405,9 +456,7 @@ class TripService:
 
         plans = []
 
-        for index, node in enumerate(
-            nodes[:TripService.MAX_ALTERNATIVE_PLANS]
-        ):
+        for node in nodes[:TripService.MAX_ALTERNATIVE_PLANS]:
             itinerary = node.itinerary
 
             charging_stops = TripService.build_charging_stops(
@@ -538,6 +587,25 @@ class TripService:
                 plan["planner_cost"]
             )
         )
+
+        return TripService.relabel_alternative_plans(
+            plans
+        )
+
+    @staticmethod
+    def relabel_alternative_plans(plans):
+        for index, plan in enumerate(plans):
+            route_leg_number = plan["route_leg"]
+            plan_number = index + 1
+
+            plan["plan_id"] = (
+                f"leg-{route_leg_number}-plan-{plan_number}"
+            )
+
+            if plan["is_recommended"]:
+                plan["label"] = "Recommended"
+            else:
+                plan["label"] = f"Alternative {plan_number}"
 
         return plans
 

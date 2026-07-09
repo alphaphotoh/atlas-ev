@@ -18,7 +18,7 @@ class RouteWeatherSampleResponse(BaseModel):
     wind_direction_degrees: float
     precipitation_mm: float
     snowfall_cm: float
-    elevation_m: float
+    elevation_m: float | None = None
     grade_percent: float
 
 
@@ -100,6 +100,15 @@ class AlternativePlansResponse(BaseModel):
     plans: list[AlternativePlanResponse]
 
 
+class AlternativePlansForRouteLegResponse(BaseModel):
+    route_leg: int
+    origin: str
+    destination: str
+    available: bool
+    recommended_plan_id: str | None = None
+    plans: list[AlternativePlanResponse]
+
+
 class TripSummaryResponse(BaseModel):
     distance_km: float
 
@@ -126,6 +135,7 @@ class TripResponse(BaseModel):
     route_legs: list[RouteLegResponse]
     charging_plan: ChargingPlanResponse
     alternative_plans: AlternativePlansResponse
+    alternative_plans_by_leg: list[AlternativePlansForRouteLegResponse] | None = None
     summary: TripSummaryResponse
 
     weather: WeatherResponse | None = None
