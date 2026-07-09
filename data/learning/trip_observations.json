@@ -1,0 +1,27 @@
+[
+  {
+    "id": "f0f2a98f-7800-4ec2-99bd-6d6d10c5083e",
+    "vehicle_id": "vf9",
+    "trip_date": "2026-07-10",
+    "origin": "Pickering, ON",
+    "destination": "Chicago, IL",
+    "distance_km": 859.1,
+    "starting_soc": 100.0,
+    "ending_soc": 25.3,
+    "charged_energy_kwh": 0.0,
+    "predicted_efficiency_kwh_per_100km": 31.7,
+    "predicted_energy_used_kwh": 272.3,
+    "actual_energy_used_kwh": 285.0,
+    "actual_efficiency_kwh_per_100km": 33.174,
+    "prediction_error_percent": 4.651,
+    "correction_factor": 1.04651,
+    "outside_temperature_c": 22.0,
+    "average_speed_kmh": 97.0,
+    "highway_ratio": 0.9,
+    "climate_control": "AC on",
+    "tire_pressure_note": "Normal",
+    "payload_note": "Family trip",
+    "notes": "Manual sample upload",
+    "created_at": "2026-07-09T22:37:46.883667+00:00"
+  }
+]
