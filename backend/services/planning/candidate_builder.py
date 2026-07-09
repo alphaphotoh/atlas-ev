@@ -1,20 +1,14 @@
 from backend.models.charging_candidate import ChargingCandidate
 
-from backend.services.planning.optimizer.departure_optimizer import (
-    DepartureOptimizer,
-)
 from backend.services.planning.projection_service import (
     ProjectionService,
-)
-from backend.services.simulation.charging_time_service import (
-    ChargingTimeService,
 )
 
 
 class CandidateBuilder:
 
     @staticmethod
-    async def build(
+    def build(
         trip,
         charger
     ):
@@ -33,62 +27,24 @@ class CandidateBuilder:
 
         )
 
-        departure_soc, next_trip = await DepartureOptimizer.optimize(
-
-            trip=trip,
+        return ChargingCandidate(
 
             charger=projected,
 
-            arrival_soc=arrival_state.soc
+            battery_state=arrival_state,
 
-        )
+            arrival_soc=arrival_state.soc,
 
-        energy_added, charging_time = (
+            departure_soc=arrival_state.soc,
 
-            ChargingTimeService.estimate(
+            destination_arrival_soc=0.0,
 
-                vehicle=trip.vehicle,
+            charge_added_kwh=0.0,
 
-                charger=projected,
+            charging_time_minutes=0.0,
 
-                arrival_soc=arrival_state.soc,
+            total_trip_time_minutes=0.0,
 
-                target_soc=departure_soc
-
-            )
-
-        )
-
-        return (
-
-            ChargingCandidate(
-
-                charger=projected,
-
-                battery_state=arrival_state,
-
-                arrival_soc=arrival_state.soc,
-
-                departure_soc=departure_soc,
-
-                destination_arrival_soc=0.0,
-
-                charge_added_kwh=energy_added,
-
-                charging_time_minutes=charging_time,
-
-                total_trip_time_minutes=(
-
-                    trip.route.duration_minutes +
-
-                    charging_time
-
-                ),
-
-                score=0.0
-
-            ),
-
-            next_trip
+            score=0.0
 
         )
