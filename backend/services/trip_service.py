@@ -1,5 +1,6 @@
 from backend.models.registry import VehicleRegistry
 
+from backend.services.planning.graph_planner import GraphPlanner
 from backend.services.planning.trip_builder import TripBuilder
 from backend.services.planning.trip_expander import TripExpander
 from backend.services.planning.waypoint_service import WaypointService
@@ -8,6 +9,7 @@ from backend.services.planning.journey_builder import JourneyBuilder
 
 class TripService:
     DETOUR_SPEED_KMH = 50
+    MAX_ALTERNATIVE_PLANS = 5
 
     @staticmethod
     async def build_trip(
@@ -54,8 +56,12 @@ class TripService:
             highway_ratio=highway_ratio
         )
 
-        itinerary = await TripExpander.expand(
+        planning_result = await TripExpander.expand_with_result(
             trip
+        )
+
+        itinerary = TripExpander.itinerary_from_result(
+            planning_result
         )
 
         return TripService.build_single_trip_response(
@@ -63,7 +69,8 @@ class TripService:
             waypoints=waypoints,
             destination=destination,
             trip=trip,
-            itinerary=itinerary
+            itinerary=itinerary,
+            planning_result=planning_result
         )
 
     @staticmethod
@@ -77,12 +84,18 @@ class TripService:
     ):
         route_legs = []
         charging_stops = []
+        alternative_plans = []
 
         stop_number = 1
 
         for index, waypoint in enumerate(trip_waypoints):
             trip = journey.trips[index]
             itinerary = journey.itineraries[index]
+
+            planning_result = None
+
+            if index < len(journey.planning_results):
+                planning_result = journey.planning_results[index]
 
             leg_charging_stops = TripService.build_charging_stops(
                 itinerary=itinerary,
@@ -94,6 +107,16 @@ class TripService:
 
             charging_stops.extend(
                 leg_charging_stops
+            )
+
+            leg_alternatives = TripService.build_alternative_plans(
+                planning_result=planning_result,
+                route_leg_number=index + 1,
+                original_trip=trip
+            )
+
+            alternative_plans.extend(
+                leg_alternatives
             )
 
             arrival_soc_without_charging = TripService.actual_arrival_soc(
@@ -177,6 +200,11 @@ class TripService:
                     1
                 )
             },
+            "alternative_plans": {
+                "available": len(alternative_plans) > 1,
+                "scope": "per_route_leg",
+                "plans": alternative_plans
+            },
             "summary": {
                 "distance_km": TripService.round_value(
                     journey.total_distance_km,
@@ -215,7 +243,8 @@ class TripService:
         waypoints,
         destination,
         trip,
-        itinerary
+        itinerary,
+        planning_result
     ):
         charging_stops = TripService.build_charging_stops(
             itinerary=itinerary,
@@ -246,6 +275,12 @@ class TripService:
             driving_minutes +
             charging_minutes +
             detour_minutes
+        )
+
+        alternative_plans = TripService.build_alternative_plans(
+            planning_result=planning_result,
+            route_leg_number=1,
+            original_trip=trip
         )
 
         return {
@@ -306,6 +341,11 @@ class TripService:
                     1
                 )
             },
+            "alternative_plans": {
+                "available": len(alternative_plans) > 1,
+                "scope": "single_route",
+                "plans": alternative_plans
+            },
             "summary": {
                 "distance_km": TripService.round_value(
                     trip.route.distance_km,
@@ -349,6 +389,195 @@ class TripService:
                 "charging_required": len(charging_stops) > 0
             }
         }
+
+    @staticmethod
+    def build_alternative_plans(
+        planning_result,
+        route_leg_number,
+        original_trip
+    ):
+        if planning_result is None:
+            return []
+
+        nodes = TripService.unique_completed_nodes(
+            planning_result=planning_result
+        )
+
+        plans = []
+
+        for index, node in enumerate(
+            nodes[:TripService.MAX_ALTERNATIVE_PLANS]
+        ):
+            itinerary = node.itinerary
+
+            charging_stops = TripService.build_charging_stops(
+                itinerary=itinerary,
+                route_leg_number=route_leg_number,
+                start_number=1
+            )
+
+            if len(charging_stops) == 0:
+                continue
+
+            charging_minutes = TripService.total_charging_minutes(
+                charging_stops
+            )
+
+            detour_minutes = TripService.total_detour_minutes(
+                charging_stops
+            )
+
+            total_trip_minutes = (
+                original_trip.route.duration_minutes +
+                charging_minutes +
+                detour_minutes
+            )
+
+            final_arrival_soc = TripService.itinerary_arrival_soc(
+                itinerary=itinerary,
+                fallback_soc=TripService.actual_arrival_soc(
+                    original_trip
+                )
+            )
+
+            is_recommended = (
+                TripService.itinerary_signature(itinerary) ==
+                TripService.itinerary_signature(
+                    planning_result.recommended.itinerary
+                )
+            )
+
+            label = f"Alternative {len(plans) + 1}"
+
+            if is_recommended:
+                label = "Recommended"
+
+            plans.append(
+                {
+                    "plan_id": (
+                        f"leg-{route_leg_number}-plan-{len(plans) + 1}"
+                    ),
+                    "route_leg": route_leg_number,
+                    "label": label,
+                    "is_recommended": is_recommended,
+                    "stops": len(charging_stops),
+                    "charging_stops": charging_stops,
+                    "total_charging_minutes": TripService.round_value(
+                        charging_minutes,
+                        1
+                    ),
+                    "total_detour_minutes": TripService.round_value(
+                        detour_minutes,
+                        1
+                    ),
+                    "estimated_total_minutes": TripService.round_value(
+                        total_trip_minutes,
+                        1
+                    ),
+                    "final_arrival_soc": TripService.round_value(
+                        final_arrival_soc,
+                        1
+                    ),
+                    "planner_cost": TripService.round_value(
+                        GraphPlanner.itinerary_cost(node),
+                        2
+                    )
+                }
+            )
+
+        return TripService.sort_alternative_plans(
+            plans
+        )
+
+    @staticmethod
+    def unique_completed_nodes(planning_result):
+        nodes = []
+
+        if planning_result.recommended is not None:
+            nodes.append(
+                planning_result.recommended
+            )
+
+        for node in planning_result.completed:
+            nodes.append(
+                node
+            )
+
+        unique = []
+        seen = set()
+
+        for node in nodes:
+            if node is None:
+                continue
+
+            signature = TripService.itinerary_signature(
+                node.itinerary
+            )
+
+            if signature in seen:
+                continue
+
+            seen.add(
+                signature
+            )
+
+            unique.append(
+                node
+            )
+
+        return unique
+
+    @staticmethod
+    def sort_alternative_plans(plans):
+        plans.sort(
+            key=lambda plan: (
+                not plan["is_recommended"],
+                plan["estimated_total_minutes"],
+                plan["total_charging_minutes"],
+                plan["stops"],
+                plan["planner_cost"]
+            )
+        )
+
+        return plans
+
+    @staticmethod
+    def itinerary_signature(itinerary):
+        if itinerary is None:
+            return tuple()
+
+        signature = []
+
+        for leg in itinerary.legs:
+            candidate = leg.selected_result
+
+            if candidate is None:
+                continue
+
+            charger = candidate.charger
+
+            signature.append(
+                (
+                    round(
+                        getattr(charger, "latitude", 0.0),
+                        5
+                    ),
+                    round(
+                        getattr(charger, "longitude", 0.0),
+                        5
+                    ),
+                    round(
+                        candidate.arrival_soc or 0.0,
+                        1
+                    ),
+                    round(
+                        candidate.departure_soc or 0.0,
+                        1
+                    )
+                )
+            )
+
+        return tuple(signature)
 
     @staticmethod
     def build_charging_stops(

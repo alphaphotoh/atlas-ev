@@ -13,8 +13,8 @@ from backend.services.simulation.charging_time_service import ChargingTimeServic
 
 
 class GraphSearch:
-    MAX_CANDIDATES = 8
-    MAX_CHILDREN = 24
+    MAX_CANDIDATES = 12
+    MAX_CHILDREN = 48
     DETOUR_SPEED_KMH = 50
 
     @staticmethod
