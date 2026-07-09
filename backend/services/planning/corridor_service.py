@@ -3,6 +3,7 @@ import math
 
 from backend.services.adapters.charger_service import ChargerService
 from backend.services.planning.corridor_cache import CorridorCache
+from backend.services.planning.planner_logger import PlannerLogger
 from backend.services.planning.search_window_service import SearchWindowService
 
 
@@ -79,9 +80,9 @@ class CorridorService:
             return chargers or []
 
         except Exception as error:
-            print()
-            print("Charger search failed")
-            print(error)
+            PlannerLogger.log()
+            PlannerLogger.log("Charger search failed")
+            PlannerLogger.log(error)
             return []
 
     @staticmethod
@@ -108,7 +109,7 @@ class CorridorService:
                 index // CorridorService.SEARCH_BATCH_SIZE
             ) + 1
 
-            print(
+            PlannerLogger.log(
                 f"Searching charger batch "
                 f"{batch_number} of {total_batches}"
             )
@@ -139,8 +140,8 @@ class CorridorService:
 
     @staticmethod
     def filter_chargers(chargers, trip):
-        print()
-        print(f"Filtering {len(chargers)} chargers")
+        PlannerLogger.log()
+        PlannerLogger.log(f"Filtering {len(chargers)} chargers")
 
         strict = {}
 
@@ -177,18 +178,18 @@ class CorridorService:
                 CorridorService.charger_key(charger)
             ] = charger
 
-        print(f"No location: {removed_no_location}")
-        print(f"No power: {removed_no_power}")
-        print(f"Below {minimum_power_kw} kW: {removed_low_power}")
-        print(f"Unsupported connector: {removed_connector}")
-        print(f"Remaining after strict filter: {len(strict)}")
+        PlannerLogger.log(f"No location: {removed_no_location}")
+        PlannerLogger.log(f"No power: {removed_no_power}")
+        PlannerLogger.log(f"Below {minimum_power_kw} kW: {removed_low_power}")
+        PlannerLogger.log(f"Unsupported connector: {removed_connector}")
+        PlannerLogger.log(f"Remaining after strict filter: {len(strict)}")
 
         if strict:
             return list(strict.values())
 
-        print()
-        print("No chargers passed strict filter.")
-        print(
+        PlannerLogger.log()
+        PlannerLogger.log("No chargers passed strict filter.")
+        PlannerLogger.log(
             f"Trying fallback filter with "
             f"{CorridorService.FALLBACK_MIN_POWER_KW} kW minimum."
         )
@@ -226,15 +227,15 @@ class CorridorService:
                 CorridorService.charger_key(charger)
             ] = charger
 
-        print(f"Fallback no location: {fallback_no_location}")
-        print(f"Fallback no power: {fallback_no_power}")
-        print(
+        PlannerLogger.log(f"Fallback no location: {fallback_no_location}")
+        PlannerLogger.log(f"Fallback no power: {fallback_no_power}")
+        PlannerLogger.log(
             f"Fallback below "
             f"{CorridorService.FALLBACK_MIN_POWER_KW} kW: "
             f"{fallback_low_power}"
         )
-        print(f"Fallback unsupported connector: {fallback_connector}")
-        print(f"Remaining after fallback filter: {len(fallback)}")
+        PlannerLogger.log(f"Fallback unsupported connector: {fallback_connector}")
+        PlannerLogger.log(f"Remaining after fallback filter: {len(fallback)}")
 
         return list(fallback.values())
 
@@ -243,28 +244,28 @@ class CorridorService:
         cached = CorridorCache.get(trip.route)
 
         if cached is not None and len(cached) > 0:
-            print()
-            print(f"Route chargers cached: {len(cached)}")
+            PlannerLogger.log()
+            PlannerLogger.log(f"Route chargers cached: {len(cached)}")
             return cached
 
         if cached is not None and len(cached) == 0:
-            print()
-            print("Cached charger list was empty.")
-            print("Ignoring empty cache and searching again.")
+            PlannerLogger.log()
+            PlannerLogger.log("Cached charger list was empty.")
+            PlannerLogger.log("Ignoring empty cache and searching again.")
 
         search_points = CorridorService.sample_route(
             trip.route.geometry
         )
 
-        print()
-        print(f"Route search points: {len(search_points)}")
+        PlannerLogger.log()
+        PlannerLogger.log(f"Route search points: {len(search_points)}")
 
         chargers = await CorridorService.search_points(
             search_points
         )
 
-        print()
-        print(f"OpenChargeMap returned {len(chargers)} chargers")
+        PlannerLogger.log()
+        PlannerLogger.log(f"OpenChargeMap returned {len(chargers)} chargers")
 
         chargers = CorridorService.filter_chargers(
             chargers,
@@ -276,8 +277,8 @@ class CorridorService:
             chargers
         )
 
-        print()
-        print(f"Route chargers after filtering: {len(chargers)}")
+        PlannerLogger.log()
+        PlannerLogger.log(f"Route chargers after filtering: {len(chargers)}")
 
         return chargers
 
@@ -293,22 +294,22 @@ class CorridorService:
             for point in search_points
         ]
 
-        print()
-        print(f"Window search points: {len(coordinates)}")
+        PlannerLogger.log()
+        PlannerLogger.log(f"Window search points: {len(coordinates)}")
 
         chargers = await CorridorService.search_points(
             coordinates
         )
 
-        print()
-        print(f"OpenChargeMap returned {len(chargers)} chargers")
+        PlannerLogger.log()
+        PlannerLogger.log(f"OpenChargeMap returned {len(chargers)} chargers")
 
         chargers = CorridorService.filter_chargers(
             chargers,
             trip
         )
 
-        print()
-        print(f"Window chargers after filtering: {len(chargers)}")
+        PlannerLogger.log()
+        PlannerLogger.log(f"Window chargers after filtering: {len(chargers)}")
 
         return chargers

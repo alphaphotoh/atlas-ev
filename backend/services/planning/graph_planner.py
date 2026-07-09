@@ -2,6 +2,7 @@ from backend.models.trip_node import TripNode
 from backend.models.trip_itinerary import TripItinerary
 
 from backend.services.planning.graph_search import GraphSearch
+from backend.services.planning.planner_logger import PlannerLogger
 
 
 class GraphPlanner:
@@ -29,11 +30,10 @@ class GraphPlanner:
                 trip=trip
             )
 
-            print("✓ Destination reachable")
-
-            print()
-            print("=" * 60)
-            print("Completed itineraries: 1")
+            PlannerLogger.log("✓ Destination reachable")
+            PlannerLogger.log()
+            PlannerLogger.log("=" * 60)
+            PlannerLogger.log("Completed itineraries: 1")
 
             return root
 
@@ -57,7 +57,7 @@ class GraphPlanner:
                 node
             )
 
-            print(
+            PlannerLogger.log(
                 f"Generated {len(children)} child node(s)."
             )
 
@@ -66,14 +66,10 @@ class GraphPlanner:
                     node=child,
                     trip=trip
                 ):
-                    print()
-                    print(
-                        "✓ Completed child itinerary found"
-                    )
-                    print(
-                        f"Depth: {child.depth}"
-                    )
-                    print(
+                    PlannerLogger.log()
+                    PlannerLogger.log("✓ Completed child itinerary found")
+                    PlannerLogger.log(f"Depth: {child.depth}")
+                    PlannerLogger.log(
                         f"Itinerary cost: "
                         f"{GraphPlanner.itinerary_cost(child):.2f}"
                     )
@@ -94,27 +90,27 @@ class GraphPlanner:
                 completed
             )
 
-            print()
-            print("✓ Best completed itinerary selected")
-            print(
+            PlannerLogger.log()
+            PlannerLogger.log("✓ Best completed itinerary selected")
+            PlannerLogger.log(
                 f"Returning completed itinerary at depth {best.depth}"
             )
-            print(
+            PlannerLogger.log(
                 f"Best itinerary cost: "
                 f"{GraphPlanner.itinerary_cost(best):.2f}"
             )
 
-            print()
-            print("=" * 60)
-            print(
+            PlannerLogger.log()
+            PlannerLogger.log("=" * 60)
+            PlannerLogger.log(
                 f"Completed itineraries: {len(completed)}"
             )
 
             return best
 
-        print()
-        print("=" * 60)
-        print("Completed itineraries: 0")
+        PlannerLogger.log()
+        PlannerLogger.log("=" * 60)
+        PlannerLogger.log("Completed itineraries: 0")
 
         return None
 
@@ -284,12 +280,12 @@ class GraphPlanner:
         if node.trip.simulation:
             estimated_soc = node.trip.simulation.arrival_soc
 
-        print()
-        print("=" * 60)
-        print(f"Depth: {node.depth}")
-        print(f"Estimated arrival SOC: {estimated_soc:.2f}%")
-        print(f"Actual arrival SOC: {actual_soc:.2f}%")
-        print(
+        PlannerLogger.log()
+        PlannerLogger.log("=" * 60)
+        PlannerLogger.log(f"Depth: {node.depth}")
+        PlannerLogger.log(f"Estimated arrival SOC: {estimated_soc:.2f}%")
+        PlannerLogger.log(f"Actual arrival SOC: {actual_soc:.2f}%")
+        PlannerLogger.log(
             f"Target destination SOC: "
             f"{trip.planning.target_destination_soc}"
         )

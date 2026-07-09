@@ -6,13 +6,10 @@ from backend.models.trip_leg import TripLeg
 
 from backend.services.planning.candidate_builder import CandidateBuilder
 from backend.services.planning.corridor_service import CorridorService
-from backend.services.planning.optimizer.departure_optimizer import (
-    DepartureOptimizer,
-)
+from backend.services.planning.optimizer.departure_optimizer import DepartureOptimizer
+from backend.services.planning.planner_logger import PlannerLogger
 from backend.services.planning.scoring_service import ScoringService
-from backend.services.simulation.charging_time_service import (
-    ChargingTimeService,
-)
+from backend.services.simulation.charging_time_service import ChargingTimeService
 
 
 class GraphSearch:
@@ -22,23 +19,22 @@ class GraphSearch:
 
     @staticmethod
     async def expand(node: TripNode):
-        print()
-        print("========== GRAPH SEARCH EXPAND ==========")
-        print(f"Depth: {node.depth}")
-        print(f"Route distance: {node.trip.route.distance_km:.1f} km")
-        print(f"Starting SOC: {getattr(node.trip, 'starting_soc', 0):.1f}%")
+        PlannerLogger.log()
+        PlannerLogger.log("========== GRAPH SEARCH EXPAND ==========")
+        PlannerLogger.log(f"Depth: {node.depth}")
+        PlannerLogger.log(f"Route distance: {node.trip.route.distance_km:.1f} km")
+        PlannerLogger.log(f"Starting SOC: {getattr(node.trip, 'starting_soc', 0):.1f}%")
 
-        actual_destination_soc = 0.0
+        actual_destination_soc = GraphSearch.trip_arrival_soc(
+            node.trip
+        )
 
-        if node.trip.battery_states:
-            actual_destination_soc = node.trip.battery_states[-1].soc
-
-        print(
+        PlannerLogger.log(
             f"Actual destination SOC: "
             f"{actual_destination_soc:.1f}%"
         )
 
-        print(
+        PlannerLogger.log(
             f"Target destination SOC: "
             f"{node.trip.planning.target_destination_soc:.1f}%"
         )
@@ -47,8 +43,8 @@ class GraphSearch:
             node.trip
         )
 
-        print()
-        print(f"Chargers returned by corridor: {len(chargers)}")
+        PlannerLogger.log()
+        PlannerLogger.log(f"Chargers returned by corridor: {len(chargers)}")
 
         candidates = []
 
@@ -65,9 +61,9 @@ class GraphSearch:
                 )
             except Exception as error:
                 candidate_build_errors += 1
-                print()
-                print("Candidate build error:")
-                print(error)
+                PlannerLogger.log()
+                PlannerLogger.log("Candidate build error:")
+                PlannerLogger.log(error)
                 continue
 
             if (
@@ -98,12 +94,12 @@ class GraphSearch:
 
             candidates.append(candidate)
 
-        print()
-        print(f"Candidate build errors: {candidate_build_errors}")
-        print(f"Rejected low arrival SOC: {rejected_low_arrival_soc}")
-        print(f"Rejected detour: {rejected_detour}")
-        print(f"Rejected visited charger: {rejected_visited}")
-        print(f"Viable candidates before limit: {len(candidates)}")
+        PlannerLogger.log()
+        PlannerLogger.log(f"Candidate build errors: {candidate_build_errors}")
+        PlannerLogger.log(f"Rejected low arrival SOC: {rejected_low_arrival_soc}")
+        PlannerLogger.log(f"Rejected detour: {rejected_detour}")
+        PlannerLogger.log(f"Rejected visited charger: {rejected_visited}")
+        PlannerLogger.log(f"Viable candidates before limit: {len(candidates)}")
 
         candidates.sort(
             key=lambda candidate: (
@@ -118,7 +114,7 @@ class GraphSearch:
 
         candidates = candidates[:GraphSearch.MAX_CANDIDATES]
 
-        print(f"Candidates considered: {len(candidates)}")
+        PlannerLogger.log(f"Candidates considered: {len(candidates)}")
 
         children = []
 
@@ -137,8 +133,8 @@ class GraphSearch:
                 if next_trip is not None
             )
 
-            print()
-            print(
+            PlannerLogger.log()
+            PlannerLogger.log(
                 f"Charge options for "
                 f"{candidate.charger.name}: "
                 f"{len(charge_options)}"
@@ -237,34 +233,34 @@ class GraphSearch:
                     )
                 )
 
-                print()
-                print("Child created:")
-                print(f"Charger: {option_candidate.charger.name}")
-                print(
+                PlannerLogger.log()
+                PlannerLogger.log("Child created:")
+                PlannerLogger.log(f"Charger: {option_candidate.charger.name}")
+                PlannerLogger.log(
                     f"Arrival SOC: "
                     f"{option_candidate.arrival_soc:.1f}%"
                 )
-                print(
+                PlannerLogger.log(
                     f"Departure SOC: "
                     f"{option_candidate.departure_soc:.1f}%"
                 )
-                print(
+                PlannerLogger.log(
                     f"Destination SOC: "
                     f"{option_candidate.destination_arrival_soc:.1f}%"
                 )
-                print(
+                PlannerLogger.log(
                     f"Power: "
                     f"{option_candidate.charger.power_kw} kW"
                 )
-                print(
+                PlannerLogger.log(
                     f"Detour: "
                     f"{option_candidate.charger.detour_distance_km:.2f} km"
                 )
-                print(
+                PlannerLogger.log(
                     f"Charging minutes: "
                     f"{option_candidate.charging_time_minutes:.1f}"
                 )
-                print(f"Score: {option_candidate.score}")
+                PlannerLogger.log(f"Score: {option_candidate.score}")
 
         children.sort(
             key=lambda child: (
@@ -277,8 +273,8 @@ class GraphSearch:
 
         children = children[:GraphSearch.MAX_CHILDREN]
 
-        print()
-        print(f"Children created: {len(children)}")
+        PlannerLogger.log()
+        PlannerLogger.log(f"Children created: {len(children)}")
 
         return children
 
