@@ -5,7 +5,11 @@ from backend.services.planning.graph_search import GraphSearch
 
 
 class GraphPlanner:
-    MAX_EXPANSIONS = 20
+    MAX_EXPANSIONS = 5
+    MAX_COMPLETED = 8
+    MAX_FRONTIER = 16
+
+    DETOUR_SPEED_KMH = 50
 
     @staticmethod
     async def plan(trip):
@@ -19,32 +23,35 @@ class GraphPlanner:
             h_cost=0.0
         )
 
+        if GraphPlanner.is_complete(root, trip):
+            GraphPlanner.print_node_status(
+                node=root,
+                trip=trip
+            )
+
+            print("✓ Destination reachable")
+
+            print()
+            print("=" * 60)
+            print("Completed itineraries: 1")
+
+            return root
+
         frontier = [root]
         completed = []
         expansions = 0
 
-        while frontier and expansions < GraphPlanner.MAX_EXPANSIONS:
+        while (
+            frontier and
+            expansions < GraphPlanner.MAX_EXPANSIONS and
+            len(completed) < GraphPlanner.MAX_COMPLETED
+        ):
             node = GraphPlanner.pop_best(frontier)
 
             GraphPlanner.print_node_status(
                 node=node,
                 trip=trip
             )
-
-            if GraphPlanner.is_complete(
-                node=node,
-                trip=trip
-            ):
-                print("✓ Destination reachable")
-                completed.append(node)
-
-                print()
-                print("=" * 60)
-                print(f"Completed itineraries: {len(completed)}")
-
-                return GraphPlanner.best_completed(
-                    completed
-                )
 
             children = await GraphSearch.expand(
                 node
@@ -54,50 +61,56 @@ class GraphPlanner:
                 f"Generated {len(children)} child node(s)."
             )
 
-            completed_children = [
-                child
-                for child in children
+            for child in children:
                 if GraphPlanner.is_complete(
                     node=child,
                     trip=trip
-                )
-            ]
+                ):
+                    print()
+                    print(
+                        "✓ Completed child itinerary found"
+                    )
+                    print(
+                        f"Depth: {child.depth}"
+                    )
+                    print(
+                        f"Itinerary cost: "
+                        f"{GraphPlanner.itinerary_cost(child):.2f}"
+                    )
 
-            if completed_children:
-                completed.extend(
-                    completed_children
-                )
+                    completed.append(child)
 
-                best = GraphPlanner.best_completed(
-                    completed
-                )
+                else:
+                    frontier.append(child)
 
-                print()
-                print("✓ Completed child itinerary found")
-                print(
-                    f"Returning completed itinerary at depth {best.depth}"
-                )
-
-                print()
-                print("=" * 60)
-                print(f"Completed itineraries: {len(completed)}")
-
-                return best
-
-            frontier.extend(
-                children
+            frontier = GraphPlanner.prune_frontier(
+                frontier
             )
 
             expansions += 1
 
         if completed:
-            print()
-            print("=" * 60)
-            print(f"Completed itineraries: {len(completed)}")
-
-            return GraphPlanner.best_completed(
+            best = GraphPlanner.best_completed(
                 completed
             )
+
+            print()
+            print("✓ Best completed itinerary selected")
+            print(
+                f"Returning completed itinerary at depth {best.depth}"
+            )
+            print(
+                f"Best itinerary cost: "
+                f"{GraphPlanner.itinerary_cost(best):.2f}"
+            )
+
+            print()
+            print("=" * 60)
+            print(
+                f"Completed itineraries: {len(completed)}"
+            )
+
+            return best
 
         print()
         print("=" * 60)
@@ -108,35 +121,145 @@ class GraphPlanner:
     @staticmethod
     def pop_best(frontier):
         frontier.sort(
-            key=lambda node: (
-                node.g_cost,
-                node.itinerary.total_trip_minutes,
-                node.itinerary.total_charging_minutes,
-                node.depth
+            key=lambda node: GraphPlanner.node_priority(
+                node
             )
         )
 
         return frontier.pop(0)
 
     @staticmethod
+    def prune_frontier(frontier):
+        frontier.sort(
+            key=lambda node: GraphPlanner.node_priority(
+                node
+            )
+        )
+
+        return frontier[
+            :GraphPlanner.MAX_FRONTIER
+        ]
+
+    @staticmethod
+    def node_priority(node):
+        return (
+            node.depth,
+            GraphPlanner.itinerary_cost(node),
+            node.g_cost
+        )
+
+    @staticmethod
     def best_completed(nodes):
         nodes.sort(
-            key=lambda node: (
-                node.itinerary.total_trip_minutes,
-                node.itinerary.total_charging_minutes,
-                node.g_cost,
-                node.depth
+            key=lambda node: GraphPlanner.itinerary_cost(
+                node
             )
         )
 
         return nodes[0]
 
     @staticmethod
-    def is_complete(node, trip):
-        if not node.trip.battery_states:
-            return False
+    def itinerary_cost(node):
+        legs = node.itinerary.legs
 
-        actual_soc = node.trip.battery_states[-1].soc
+        if not legs:
+            return 0.0
+
+        stops = len(legs)
+
+        total_trip_minutes = (
+            node.itinerary.total_trip_minutes
+            or node.g_cost
+            or 0.0
+        )
+
+        total_charging_minutes = (
+            node.itinerary.total_charging_minutes
+            or 0.0
+        )
+
+        total_detour_minutes = 0.0
+        full_charge_penalty = 0.0
+        low_score_penalty = 0.0
+        excessive_soc_added_penalty = 0.0
+
+        for leg in legs:
+            candidate = leg.selected_result
+
+            if candidate is None:
+                continue
+
+            detour_km = (
+                candidate.charger.detour_distance_km
+                or 0.0
+            )
+
+            total_detour_minutes += (
+                detour_km /
+                GraphPlanner.DETOUR_SPEED_KMH
+            ) * 60
+
+            if candidate.departure_soc >= 99.5:
+                full_charge_penalty += 150.0
+
+            score = (
+                candidate.score
+                or 0.0
+            )
+
+            if score < 500.0:
+                low_score_penalty += (
+                    500.0 -
+                    score
+                ) * 0.2
+
+            soc_added = max(
+                candidate.departure_soc -
+                candidate.arrival_soc,
+                0.0
+            )
+
+            if soc_added > 70.0:
+                excessive_soc_added_penalty += (
+                    soc_added -
+                    70.0
+                ) * 8.0
+
+        final_soc = GraphPlanner.actual_arrival_soc(
+            node
+        )
+
+        target_soc = (
+            node.trip.planning.target_destination_soc
+        )
+
+        excess_final_soc_penalty = max(
+            final_soc -
+            target_soc,
+            0.0
+        ) * 2.0
+
+        cost = (
+            total_trip_minutes +
+            total_charging_minutes * 0.8 +
+            total_detour_minutes * 3.0 +
+            stops * 120.0 +
+            full_charge_penalty +
+            low_score_penalty +
+            excessive_soc_added_penalty +
+            excess_final_soc_penalty
+        )
+
+        return round(
+            cost,
+            2
+        )
+
+    @staticmethod
+    def is_complete(node, trip):
+        actual_soc = GraphPlanner.actual_arrival_soc(
+            node
+        )
 
         return (
             actual_soc >=
@@ -144,11 +267,17 @@ class GraphPlanner:
         )
 
     @staticmethod
-    def print_node_status(node, trip):
-        actual_soc = 0.0
+    def actual_arrival_soc(node):
+        if not node.trip.battery_states:
+            return 0.0
 
-        if node.trip.battery_states:
-            actual_soc = node.trip.battery_states[-1].soc
+        return node.trip.battery_states[-1].soc
+
+    @staticmethod
+    def print_node_status(node, trip):
+        actual_soc = GraphPlanner.actual_arrival_soc(
+            node
+        )
 
         estimated_soc = 0.0
 

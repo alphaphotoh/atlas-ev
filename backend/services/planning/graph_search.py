@@ -1,55 +1,41 @@
+import copy
+
 from backend.models.trip_node import TripNode
 from backend.models.trip_itinerary import TripItinerary
 from backend.models.trip_leg import TripLeg
 
-from backend.services.planning.candidate_builder import (
-    CandidateBuilder,
-)
-from backend.services.planning.corridor_service import (
-    CorridorService,
-)
+from backend.services.planning.candidate_builder import CandidateBuilder
+from backend.services.planning.corridor_service import CorridorService
 from backend.services.planning.optimizer.departure_optimizer import (
     DepartureOptimizer,
 )
-from backend.services.planning.scoring_service import (
-    ScoringService,
-)
+from backend.services.planning.scoring_service import ScoringService
 from backend.services.simulation.charging_time_service import (
     ChargingTimeService,
 )
 
 
 class GraphSearch:
-
-    MAX_CANDIDATES = 12
-
+    MAX_CANDIDATES = 8
+    MAX_CHILDREN = 24
     DETOUR_SPEED_KMH = 50
 
     @staticmethod
-    async def expand(
-        node: TripNode
-    ):
-
+    async def expand(node: TripNode):
         print()
         print("========== GRAPH SEARCH EXPAND ==========")
+        print(f"Depth: {node.depth}")
+        print(f"Route distance: {node.trip.route.distance_km:.1f} km")
+        print(f"Starting SOC: {getattr(node.trip, 'starting_soc', 0):.1f}%")
 
-        print(
-            f"Depth: {node.depth}"
-        )
+        actual_destination_soc = 0.0
 
-        print(
-            f"Route distance: "
-            f"{node.trip.route.distance_km:.1f} km"
-        )
-
-        print(
-            f"Starting SOC: "
-            f"{getattr(node.trip, 'starting_soc', 0):.1f}%"
-        )
+        if node.trip.battery_states:
+            actual_destination_soc = node.trip.battery_states[-1].soc
 
         print(
             f"Actual destination SOC: "
-            f"{node.trip.battery_states[-1].soc:.1f}%"
+            f"{actual_destination_soc:.1f}%"
         )
 
         print(
@@ -58,16 +44,11 @@ class GraphSearch:
         )
 
         chargers = await CorridorService.find_chargers(
-
             node.trip
-
         )
 
         print()
-        print(
-            f"Chargers returned by corridor: "
-            f"{len(chargers)}"
-        )
+        print(f"Chargers returned by corridor: {len(chargers)}")
 
         candidates = []
 
@@ -77,393 +58,265 @@ class GraphSearch:
         candidate_build_errors = 0
 
         for charger in chargers:
-
             try:
-
                 candidate = CandidateBuilder.build(
-
                     trip=node.trip,
-
                     charger=charger
-
                 )
-
             except Exception as error:
-
                 candidate_build_errors += 1
-
                 print()
-                print(
-                    "Candidate build error:"
-                )
-
-                print(
-                    error
-                )
-
+                print("Candidate build error:")
+                print(error)
                 continue
 
             if (
-
                 candidate.arrival_soc <
-
                 node.trip.planning.minimum_charger_arrival_soc
-
             ):
-
                 rejected_low_arrival_soc += 1
-
                 continue
 
             detour_distance_km = (
-
-                candidate.charger.detour_distance_km
-
-                or 0.0
-
+                candidate.charger.detour_distance_km or 0.0
             )
 
             if (
-
                 detour_distance_km >
-
                 node.trip.planning.maximum_detour_km
-
             ):
-
                 rejected_detour += 1
-
                 continue
 
             charger_id = GraphSearch.charger_id(
-
                 candidate.charger
-
             )
 
             if charger_id in node.visited_chargers:
-
                 rejected_visited += 1
-
                 continue
 
-            candidates.append(
-
-                candidate
-
-            )
+            candidates.append(candidate)
 
         print()
-        print(
-            f"Candidate build errors: "
-            f"{candidate_build_errors}"
-        )
-
-        print(
-            f"Rejected low arrival SOC: "
-            f"{rejected_low_arrival_soc}"
-        )
-
-        print(
-            f"Rejected detour: "
-            f"{rejected_detour}"
-        )
-
-        print(
-            f"Rejected visited charger: "
-            f"{rejected_visited}"
-        )
-
-        print(
-            f"Viable candidates before limit: "
-            f"{len(candidates)}"
-        )
+        print(f"Candidate build errors: {candidate_build_errors}")
+        print(f"Rejected low arrival SOC: {rejected_low_arrival_soc}")
+        print(f"Rejected detour: {rejected_detour}")
+        print(f"Rejected visited charger: {rejected_visited}")
+        print(f"Viable candidates before limit: {len(candidates)}")
 
         candidates.sort(
-
             key=lambda candidate: (
-
                 GraphSearch.arrival_soc_penalty(
-
                     candidate,
-
                     node.trip.planning
-
                 ),
-
                 candidate.charger.detour_distance_km or 0.0,
-
                 -(candidate.charger.power_kw or 0.0)
-
             )
-
         )
 
-        candidates = candidates[
+        candidates = candidates[:GraphSearch.MAX_CANDIDATES]
 
-            :GraphSearch.MAX_CANDIDATES
-
-        ]
-
-        print(
-            f"Candidates considered: "
-            f"{len(candidates)}"
-        )
+        print(f"Candidates considered: {len(candidates)}")
 
         children = []
 
         for candidate in candidates:
-
-            departure_soc, next_trip = await DepartureOptimizer.optimize(
-
+            charge_options = await DepartureOptimizer.optimize_options(
                 trip=node.trip,
-
                 charger=candidate.charger,
-
                 arrival_soc=candidate.arrival_soc
-
             )
 
-            if next_trip is None:
-
-                continue
-
-            candidate.departure_soc = departure_soc
-
-            candidate.destination_arrival_soc = (
-
-                next_trip.battery_states[-1].soc
-
-            )
-
-            energy_added, charging_time = ChargingTimeService.estimate(
-
-                vehicle=node.trip.vehicle,
-
-                charger=candidate.charger,
-
-                arrival_soc=candidate.arrival_soc,
-
-                target_soc=departure_soc
-
-            )
-
-            candidate.charge_added_kwh = energy_added
-
-            candidate.charging_time_minutes = charging_time
-
-            detour_distance_km = (
-
-                candidate.charger.detour_distance_km
-
-                or 0.0
-
-            )
-
-            detour_minutes = (
-
-                detour_distance_km /
-
-                GraphSearch.DETOUR_SPEED_KMH
-
-            ) * 60
-
-            candidate.total_trip_time_minutes = round(
-
-                next_trip.route.duration_minutes +
-
-                charging_time +
-
-                detour_minutes,
-
-                1
-
-            )
-
-            candidate.score = ScoringService.score(
-
-                candidate,
-
-                node.trip.planning
-
-            )
-
-            itinerary = TripItinerary()
-
-            itinerary.legs.extend(
-
-                node.itinerary.legs
-
-            )
-
-            itinerary.add_leg(
-
-                TripLeg(
-
-                    number=node.depth + 1,
-
-                    route=node.trip.route,
-
-                    battery_states=node.trip.battery_states,
-
-                    results=candidates,
-
-                    selected_result=candidate
-
-                )
-
-            )
-
-            visited = set(
-
-                node.visited_chargers
-
-            )
-
-            visited.add(
-
-                GraphSearch.charger_id(
-
-                    candidate.charger
-
-                )
-
-            )
-
-            children.append(
-
-                TripNode(
-
-                    trip=next_trip,
-
-                    itinerary=itinerary,
-
-                    depth=node.depth + 1,
-
-                    parent=node,
-
-                    visited_chargers=visited,
-
-                    g_cost=(
-
-                        node.g_cost +
-
-                        candidate.total_trip_time_minutes
-
-                    ),
-
-                    h_cost=0.0
-
-                )
-
+            target_soc = node.trip.planning.target_destination_soc
+
+            destination_reachable_from_charger = any(
+                GraphSearch.trip_arrival_soc(next_trip) >= target_soc
+                for _, next_trip in charge_options
+                if next_trip is not None
             )
 
             print()
             print(
-                "Child created:"
+                f"Charge options for "
+                f"{candidate.charger.name}: "
+                f"{len(charge_options)}"
             )
 
-            print(
-                f"Charger: {candidate.charger.name}"
-            )
+            for departure_soc, next_trip in charge_options:
+                if next_trip is None:
+                    continue
 
-            print(
-                f"Arrival SOC: "
-                f"{candidate.arrival_soc:.1f}%"
-            )
+                option_candidate = copy.deepcopy(candidate)
 
-            print(
-                f"Departure SOC: "
-                f"{candidate.departure_soc:.1f}%"
-            )
+                option_candidate.departure_soc = departure_soc
 
-            print(
-                f"Destination SOC: "
-                f"{candidate.destination_arrival_soc:.1f}%"
-            )
+                option_candidate.destination_arrival_soc = (
+                    GraphSearch.trip_arrival_soc(next_trip)
+                )
 
-            print(
-                f"Power: "
-                f"{candidate.charger.power_kw} kW"
-            )
+                option_candidate.requires_additional_stop = (
+                    option_candidate.destination_arrival_soc <
+                    target_soc
+                )
 
-            print(
-                f"Detour: "
-                f"{candidate.charger.detour_distance_km:.2f} km"
-            )
+                option_candidate.destination_reachable_from_charger = (
+                    destination_reachable_from_charger
+                )
 
-            print(
-                f"Score: "
-                f"{candidate.score}"
-            )
+                energy_added, charging_time = ChargingTimeService.estimate(
+                    vehicle=node.trip.vehicle,
+                    charger=option_candidate.charger,
+                    arrival_soc=option_candidate.arrival_soc,
+                    target_soc=departure_soc
+                )
+
+                option_candidate.charge_added_kwh = energy_added
+                option_candidate.charging_time_minutes = charging_time
+
+                detour_distance_km = (
+                    option_candidate.charger.detour_distance_km or 0.0
+                )
+
+                detour_minutes = (
+                    detour_distance_km /
+                    GraphSearch.DETOUR_SPEED_KMH
+                ) * 60
+
+                option_candidate.total_trip_time_minutes = round(
+                    next_trip.route.duration_minutes +
+                    charging_time +
+                    detour_minutes,
+                    1
+                )
+
+                option_candidate.score = ScoringService.score(
+                    option_candidate,
+                    node.trip.planning
+                )
+
+                itinerary = TripItinerary()
+
+                itinerary.legs.extend(
+                    node.itinerary.legs
+                )
+
+                itinerary.add_leg(
+                    TripLeg(
+                        number=node.depth + 1,
+                        route=node.trip.route,
+                        battery_states=node.trip.battery_states,
+                        results=[],
+                        selected_result=option_candidate
+                    )
+                )
+
+                visited = set(
+                    node.visited_chargers
+                )
+
+                visited.add(
+                    GraphSearch.charger_id(
+                        option_candidate.charger
+                    )
+                )
+
+                children.append(
+                    TripNode(
+                        trip=next_trip,
+                        itinerary=itinerary,
+                        depth=node.depth + 1,
+                        parent=node,
+                        visited_chargers=visited,
+                        g_cost=(
+                            node.g_cost +
+                            option_candidate.total_trip_time_minutes
+                        ),
+                        h_cost=0.0
+                    )
+                )
+
+                print()
+                print("Child created:")
+                print(f"Charger: {option_candidate.charger.name}")
+                print(
+                    f"Arrival SOC: "
+                    f"{option_candidate.arrival_soc:.1f}%"
+                )
+                print(
+                    f"Departure SOC: "
+                    f"{option_candidate.departure_soc:.1f}%"
+                )
+                print(
+                    f"Destination SOC: "
+                    f"{option_candidate.destination_arrival_soc:.1f}%"
+                )
+                print(
+                    f"Power: "
+                    f"{option_candidate.charger.power_kw} kW"
+                )
+                print(
+                    f"Detour: "
+                    f"{option_candidate.charger.detour_distance_km:.2f} km"
+                )
+                print(
+                    f"Charging minutes: "
+                    f"{option_candidate.charging_time_minutes:.1f}"
+                )
+                print(f"Score: {option_candidate.score}")
 
         children.sort(
-
             key=lambda child: (
-
+                child.itinerary.total_charging_minutes,
+                child.itinerary.total_trip_minutes,
                 -child.itinerary.last_leg.selected_result.score,
-
                 child.g_cost
-
             )
-
         )
+
+        children = children[:GraphSearch.MAX_CHILDREN]
 
         print()
-        print(
-            f"Children created: "
-            f"{len(children)}"
-        )
+        print(f"Children created: {len(children)}")
 
         return children
 
     @staticmethod
-    def charger_id(
-        charger
-    ):
+    def trip_arrival_soc(trip):
+        if trip is None:
+            return 0.0
 
+        if not trip.battery_states:
+            return 0.0
+
+        return trip.battery_states[-1].soc
+
+    @staticmethod
+    def charger_id(charger):
         return (
-
             round(charger.latitude, 6),
-
             round(charger.longitude, 6)
-
         )
 
     @staticmethod
-    def arrival_soc_penalty(
-        candidate,
-        planning
-    ):
-
+    def arrival_soc_penalty(candidate, planning):
         arrival_soc = candidate.arrival_soc
 
         if (
-
             planning.ideal_charger_arrival_soc_min
-
             <= arrival_soc
-
             <= planning.ideal_charger_arrival_soc_max
-
         ):
-
             return 0.0
 
         if arrival_soc < planning.ideal_charger_arrival_soc_min:
-
             return (
-
                 planning.ideal_charger_arrival_soc_min -
-
                 arrival_soc
-
             )
 
         return (
-
             arrival_soc -
-
             planning.ideal_charger_arrival_soc_max
-
         )
