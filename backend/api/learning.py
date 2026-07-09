@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 
 from backend.schemas.learning import (
     LearningProfileResponse,
@@ -7,6 +7,7 @@ from backend.schemas.learning import (
     TripObservationListResponse,
     TripObservationUploadRequest,
 )
+from backend.services.learning.csv_template_service import CsvTemplateService
 from backend.services.learning.learning_service import LearningService
 
 
@@ -64,6 +65,23 @@ async def import_trip_observations_csv(
             status_code=400,
             detail=str(error)
         ) from error
+
+
+@router.get(
+    "/template-csv"
+)
+async def download_learning_csv_template():
+    csv_text = CsvTemplateService.build_template()
+
+    return Response(
+        content=csv_text,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{CsvTemplateService.FILENAME}"'
+            )
+        }
+    )
 
 
 @router.get(
