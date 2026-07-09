@@ -1,5 +1,6 @@
 from backend.models.registry import VehicleRegistry
 
+from backend.services.learning.learning_service import LearningService
 from backend.services.planning.graph_planner import GraphPlanner
 from backend.services.planning.trip_builder import TripBuilder
 from backend.services.planning.trip_expander import TripExpander
@@ -217,6 +218,9 @@ class TripService:
                 "plans": alternative_plans
             },
             "alternative_plans_by_leg": alternative_plan_groups,
+            "learning": TripService.build_journey_learning_response(
+                journey
+            ),
             "summary": {
                 "distance_km": TripService.round_value(
                     journey.total_distance_km,
@@ -371,6 +375,9 @@ class TripService:
                 "plans": alternative_plans
             },
             "alternative_plans_by_leg": alternative_plan_groups,
+            "learning": TripService.build_learning_response(
+                trip
+            ),
             "summary": {
                 "distance_km": TripService.round_value(
                     trip.route.distance_km,
@@ -413,6 +420,120 @@ class TripService:
                 ),
                 "charging_required": len(charging_stops) > 0
             }
+        }
+
+    @staticmethod
+    def build_journey_learning_response(journey):
+        if journey is None:
+            return None
+
+        if not journey.trips:
+            return None
+
+        return TripService.build_learning_response(
+            journey.trips[0]
+        )
+
+    @staticmethod
+    def build_learning_response(trip):
+        if trip is None:
+            return None
+
+        vehicle_id = getattr(
+            trip,
+            "learning_vehicle_id",
+            None
+        )
+
+        correction_factor = getattr(
+            trip,
+            "learning_correction_factor",
+            1.0
+        )
+
+        base_predicted_efficiency = getattr(
+            trip,
+            "base_predicted_efficiency",
+            None
+        )
+
+        learned_predicted_efficiency = getattr(
+            trip,
+            "learned_predicted_efficiency",
+            None
+        )
+
+        if learned_predicted_efficiency is None and trip.simulation:
+            learned_predicted_efficiency = trip.simulation.predicted_efficiency
+
+        profile = None
+
+        if vehicle_id:
+            profile = LearningService.get_profile(
+                vehicle_id=vehicle_id
+            )
+
+        observation_count = 0
+        confidence_score = 0.0
+        average_predicted_efficiency = None
+        average_actual_efficiency = None
+        average_prediction_error_percent = None
+
+        if profile:
+            observation_count = profile.get(
+                "observation_count",
+                0
+            )
+
+            confidence_score = profile.get(
+                "confidence_score",
+                0.0
+            )
+
+            average_predicted_efficiency = profile.get(
+                "average_predicted_efficiency_kwh_per_100km"
+            )
+
+            average_actual_efficiency = profile.get(
+                "average_actual_efficiency_kwh_per_100km"
+            )
+
+            average_prediction_error_percent = profile.get(
+                "average_prediction_error_percent"
+            )
+
+        return {
+            "applied": observation_count > 0,
+            "vehicle_id": vehicle_id,
+            "correction_factor": TripService.round_value(
+                correction_factor,
+                5
+            ),
+            "confidence_score": TripService.round_value(
+                confidence_score,
+                3
+            ),
+            "observation_count": observation_count,
+            "base_predicted_efficiency": TripService.round_value(
+                base_predicted_efficiency,
+                3
+            ),
+            "learned_predicted_efficiency": TripService.round_value(
+                learned_predicted_efficiency,
+                3
+            ),
+            "average_predicted_efficiency_kwh_per_100km": TripService.round_value(
+                average_predicted_efficiency,
+                3
+            ),
+            "average_actual_efficiency_kwh_per_100km": TripService.round_value(
+                average_actual_efficiency,
+                3
+            ),
+            "average_prediction_error_percent": TripService.round_value(
+                average_prediction_error_percent,
+                3
+            )
         }
 
     @staticmethod

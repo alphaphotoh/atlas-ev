@@ -109,6 +109,22 @@ class AlternativePlansForRouteLegResponse(BaseModel):
     plans: list[AlternativePlanResponse]
 
 
+class LearningSummaryResponse(BaseModel):
+    applied: bool
+    vehicle_id: str | None = None
+
+    correction_factor: float = 1.0
+    confidence_score: float = 0.0
+    observation_count: int = 0
+
+    base_predicted_efficiency: float | None = None
+    learned_predicted_efficiency: float | None = None
+
+    average_predicted_efficiency_kwh_per_100km: float | None = None
+    average_actual_efficiency_kwh_per_100km: float | None = None
+    average_prediction_error_percent: float | None = None
+
+
 class TripSummaryResponse(BaseModel):
     distance_km: float
 
@@ -136,6 +152,7 @@ class TripResponse(BaseModel):
     charging_plan: ChargingPlanResponse
     alternative_plans: AlternativePlansResponse
     alternative_plans_by_leg: list[AlternativePlansForRouteLegResponse] | None = None
+    learning: LearningSummaryResponse | None = None
     summary: TripSummaryResponse
 
     weather: WeatherResponse | None = None
