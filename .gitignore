@@ -21,3 +21,9 @@ Thumbs.db
 
 #Temporary Files
 notes.txt
+
+if (-not (Select-String -Path .gitignore -Pattern '^vf9_learning_test_trips\.csv$' -Quiet)) {
+    Add-Content .gitignore 'vf9_learning_test_trips.csv'
+}
+
+git status

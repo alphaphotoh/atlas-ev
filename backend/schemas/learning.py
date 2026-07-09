@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 class TripObservationUploadRequest(BaseModel):
     vehicle_id: str = Field(
         ...,
-        description="Vehicle identifier, for example vf9_plus"
+        description="Vehicle identifier, for example vf9"
     )
 
     trip_date: str | None = Field(
@@ -128,3 +128,18 @@ class LearningUploadResponse(BaseModel):
 class TripObservationListResponse(BaseModel):
     vehicle_id: str
     observations: list[TripObservationResponse]
+
+
+class TripObservationImportErrorResponse(BaseModel):
+    row_number: int
+    error: str
+    data: dict[str, str | None] | None = None
+
+
+class TripObservationImportResponse(BaseModel):
+    vehicle_id: str | None
+    imported_count: int
+    failed_count: int
+    observations: list[TripObservationResponse]
+    profile: LearningProfileResponse | None = None
+    errors: list[TripObservationImportErrorResponse]

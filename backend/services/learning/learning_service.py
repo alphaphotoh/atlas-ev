@@ -1,13 +1,25 @@
+import csv
+import io
+
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from backend.models.learning_profile import LearningProfile
 from backend.models.registry import VehicleRegistry
 from backend.models.trip_observation import TripObservation
+from backend.schemas.learning import TripObservationUploadRequest
 from backend.services.learning.learning_repository import LearningRepository
 
 
 class LearningService:
+    EMPTY_VALUES = {
+        "",
+        "none",
+        "null",
+        "n/a",
+        "na"
+    }
+
     @staticmethod
     def upload_trip(request):
         vehicle = LearningService.get_vehicle(
@@ -115,6 +127,248 @@ class LearningService:
             "observation": observation.to_dict(),
             "profile": profile
         }
+
+    @staticmethod
+    def import_csv_text(
+        csv_text,
+        default_vehicle_id=None
+    ):
+        if csv_text is None:
+            raise ValueError(
+                "CSV content is required"
+            )
+
+        csv_text = csv_text.strip()
+
+        if not csv_text:
+            raise ValueError(
+                "CSV content is empty"
+            )
+
+        reader = csv.DictReader(
+            io.StringIO(csv_text)
+        )
+
+        if not reader.fieldnames:
+            raise ValueError(
+                "CSV header row is missing"
+            )
+
+        observations = []
+        errors = []
+        vehicle_ids = set()
+        last_profile = None
+
+        for row_number, row in enumerate(
+            reader,
+            start=2
+        ):
+            try:
+                request = LearningService.build_upload_request_from_csv_row(
+                    row=row,
+                    default_vehicle_id=default_vehicle_id
+                )
+
+                response = LearningService.upload_trip(
+                    request
+                )
+
+                observations.append(
+                    response["observation"]
+                )
+
+                last_profile = response["profile"]
+
+                vehicle_ids.add(
+                    request.vehicle_id
+                )
+
+            except Exception as error:
+                errors.append(
+                    {
+                        "row_number": row_number,
+                        "error": str(error),
+                        "data": LearningService.clean_csv_error_data(
+                            row
+                        )
+                    }
+                )
+
+        vehicle_id = None
+
+        if len(vehicle_ids) == 1:
+            vehicle_id = next(
+                iter(vehicle_ids)
+            )
+
+        return {
+            "vehicle_id": vehicle_id,
+            "imported_count": len(observations),
+            "failed_count": len(errors),
+            "observations": observations,
+            "profile": last_profile,
+            "errors": errors
+        }
+
+    @staticmethod
+    def build_upload_request_from_csv_row(
+        row,
+        default_vehicle_id=None
+    ):
+        normalized_row = LearningService.normalize_csv_row(
+            row
+        )
+
+        vehicle_id = LearningService.get_csv_string(
+            normalized_row,
+            [
+                "vehicle_id",
+                "vehicle",
+                "car"
+            ],
+            default_value=default_vehicle_id
+        )
+
+        if not vehicle_id:
+            raise ValueError(
+                "vehicle_id is required"
+            )
+
+        return TripObservationUploadRequest(
+            vehicle_id=vehicle_id,
+            trip_date=LearningService.get_csv_string(
+                normalized_row,
+                [
+                    "trip_date",
+                    "date"
+                ]
+            ),
+            origin=LearningService.get_csv_string(
+                normalized_row,
+                [
+                    "origin",
+                    "start",
+                    "from"
+                ]
+            ),
+            destination=LearningService.get_csv_string(
+                normalized_row,
+                [
+                    "destination",
+                    "end",
+                    "to"
+                ]
+            ),
+            distance_km=LearningService.get_required_csv_float(
+                normalized_row,
+                [
+                    "distance_km",
+                    "distance"
+                ]
+            ),
+            starting_soc=LearningService.get_required_csv_float(
+                normalized_row,
+                [
+                    "starting_soc",
+                    "start_soc",
+                    "starting_soc_percent"
+                ]
+            ),
+            ending_soc=LearningService.get_required_csv_float(
+                normalized_row,
+                [
+                    "ending_soc",
+                    "end_soc",
+                    "ending_soc_percent"
+                ]
+            ),
+            charged_energy_kwh=LearningService.get_optional_csv_float(
+                normalized_row,
+                [
+                    "charged_energy_kwh",
+                    "charging_energy_kwh",
+                    "charge_added_kwh"
+                ],
+                default_value=0.0
+            ),
+            actual_energy_used_kwh=LearningService.get_optional_csv_float(
+                normalized_row,
+                [
+                    "actual_energy_used_kwh",
+                    "actual_energy_kwh",
+                    "energy_used_kwh"
+                ]
+            ),
+            predicted_efficiency_kwh_per_100km=LearningService.get_required_csv_float(
+                normalized_row,
+                [
+                    "predicted_efficiency_kwh_per_100km",
+                    "predicted_efficiency",
+                    "planner_efficiency"
+                ]
+            ),
+            predicted_energy_used_kwh=LearningService.get_optional_csv_float(
+                normalized_row,
+                [
+                    "predicted_energy_used_kwh",
+                    "predicted_energy_kwh",
+                    "planner_energy_kwh"
+                ]
+            ),
+            outside_temperature_c=LearningService.get_optional_csv_float(
+                normalized_row,
+                [
+                    "outside_temperature_c",
+                    "temperature_c",
+                    "temp_c"
+                ]
+            ),
+            average_speed_kmh=LearningService.get_optional_csv_float(
+                normalized_row,
+                [
+                    "average_speed_kmh",
+                    "avg_speed_kmh",
+                    "average_speed"
+                ]
+            ),
+            highway_ratio=LearningService.get_optional_csv_float(
+                normalized_row,
+                [
+                    "highway_ratio",
+                    "highway_percent"
+                ]
+            ),
+            climate_control=LearningService.get_csv_string(
+                normalized_row,
+                [
+                    "climate_control",
+                    "hvac",
+                    "ac_heater"
+                ]
+            ),
+            tire_pressure_note=LearningService.get_csv_string(
+                normalized_row,
+                [
+                    "tire_pressure_note",
+                    "tire_pressure"
+                ]
+            ),
+            payload_note=LearningService.get_csv_string(
+                normalized_row,
+                [
+                    "payload_note",
+                    "payload",
+                    "passengers"
+                ]
+            ),
+            notes=LearningService.get_csv_string(
+                normalized_row,
+                [
+                    "notes",
+                    "note"
+                ]
+            )
+        )
 
     @staticmethod
     def get_profile(vehicle_id):
@@ -345,6 +599,116 @@ class LearningService:
             score,
             3
         )
+
+    @staticmethod
+    def normalize_csv_row(row):
+        normalized = {}
+
+        for key, value in row.items():
+            if key is None:
+                continue
+
+            normalized_key = (
+                key.strip()
+                .lower()
+                .replace(" ", "_")
+                .replace("-", "_")
+            )
+
+            normalized[
+                normalized_key
+            ] = value
+
+        return normalized
+
+    @staticmethod
+    def get_csv_string(
+        row,
+        names,
+        default_value=None
+    ):
+        for name in names:
+            value = row.get(
+                name
+            )
+
+            if not LearningService.is_empty_value(
+                value
+            ):
+                return str(
+                    value
+                ).strip()
+
+        return default_value
+
+    @staticmethod
+    def get_required_csv_float(
+        row,
+        names
+    ):
+        value = LearningService.get_optional_csv_float(
+            row=row,
+            names=names
+        )
+
+        if value is None:
+            raise ValueError(
+                f"Missing required numeric column: {names[0]}"
+            )
+
+        return value
+
+    @staticmethod
+    def get_optional_csv_float(
+        row,
+        names,
+        default_value=None
+    ):
+        for name in names:
+            value = row.get(
+                name
+            )
+
+            if LearningService.is_empty_value(
+                value
+            ):
+                continue
+
+            try:
+                return float(
+                    str(value).strip()
+                )
+
+            except ValueError as error:
+                raise ValueError(
+                    f"Invalid numeric value for {name}: {value}"
+                ) from error
+
+        return default_value
+
+    @staticmethod
+    def is_empty_value(value):
+        if value is None:
+            return True
+
+        return (
+            str(value).strip().lower()
+            in LearningService.EMPTY_VALUES
+        )
+
+    @staticmethod
+    def clean_csv_error_data(row):
+        cleaned = {}
+
+        for key, value in row.items():
+            if key is None:
+                continue
+
+            cleaned[
+                key
+            ] = value
+
+        return cleaned
 
     @staticmethod
     def utcnow():

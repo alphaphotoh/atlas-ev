@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from backend.schemas.learning import (
     LearningProfileResponse,
     LearningUploadResponse,
+    TripObservationImportResponse,
     TripObservationListResponse,
     TripObservationUploadRequest,
 )
@@ -26,6 +27,37 @@ async def upload_trip_observation(
         return LearningService.upload_trip(
             request
         )
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error)
+        ) from error
+
+
+@router.post(
+    "/import-csv",
+    response_model=TripObservationImportResponse
+)
+async def import_trip_observations_csv(
+    file: UploadFile = File(...)
+):
+    try:
+        content = await file.read()
+
+        csv_text = content.decode(
+            "utf-8-sig"
+        )
+
+        return LearningService.import_csv_text(
+            csv_text=csv_text
+        )
+
+    except UnicodeDecodeError as error:
+        raise HTTPException(
+            status_code=400,
+            detail="CSV file must be UTF-8 encoded"
+        ) from error
 
     except ValueError as error:
         raise HTTPException(
