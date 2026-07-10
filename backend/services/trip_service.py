@@ -7,6 +7,8 @@ from backend.services.planning.trip_expander import TripExpander
 from backend.services.planning.waypoint_service import WaypointService
 from backend.services.planning.journey_builder import JourneyBuilder
 
+from backend.services.learning.learning_service import LearningService
+from backend.services.planning.map_response_service import MapResponseService
 
 class TripService:
     DETOUR_SPEED_KMH = 50
@@ -218,6 +220,13 @@ class TripService:
                 "plans": alternative_plans
             },
             "alternative_plans_by_leg": alternative_plan_groups,
+            "map": MapResponseService.build(
+                origin=origin,
+                waypoints=waypoints,
+                destination=destination,
+                trips=journey.trips,
+                charging_stops=charging_stops
+            ),
             "learning": TripService.build_journey_learning_response(
                 journey
             ),
@@ -375,6 +384,15 @@ class TripService:
                 "plans": alternative_plans
             },
             "alternative_plans_by_leg": alternative_plan_groups,
+            "map": MapResponseService.build(
+                origin=origin,
+                waypoints=waypoints,
+                destination=destination,
+                trips=[
+                    trip
+                ],
+                charging_stops=charging_stops
+            ),
             "learning": TripService.build_learning_response(
                 trip
             ),

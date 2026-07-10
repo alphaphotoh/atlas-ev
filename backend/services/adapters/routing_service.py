@@ -1,56 +1,155 @@
-from backend.core.config import ORS_API_KEY
-from backend.core.http_client import HttpClient
+import os
+
+import httpx
 
 from backend.models.route import Route
-from backend.services.routing.segment_service import SegmentService
-from backend.utils.route_utils import RouteUtils
 
 
 class RoutingService:
+    ORS_ROUTE_URL = (
+        "https://api.openrouteservice.org/v2/directions/driving-car/geojson"
+    )
 
-    BASE_URL = "https://api.openrouteservice.org/v2/directions/driving-car"
+    TIMEOUT_SECONDS = 60
 
     @staticmethod
-    async def get_route(start, end):
+    async def get_route(
+        start,
+        end
+    ):
+        api_key = RoutingService.get_api_key()
 
-        headers = {
-            "Authorization": ORS_API_KEY,
-            "Content-Type": "application/json"
-        }
-
-        body = {
+        payload = {
             "coordinates": [
                 start,
                 end
-            ]
+            ],
+            "instructions": False,
+            "geometry": True
         }
 
-        response = await HttpClient.post(
-            RoutingService.BASE_URL,
-            headers=headers,
-            json=body
-        )
+        headers = {
+            "Authorization": api_key,
+            "Content-Type": "application/json",
+            "Accept": "application/geo+json, application/json"
+        }
+
+        async with httpx.AsyncClient(
+            timeout=RoutingService.TIMEOUT_SECONDS
+        ) as client:
+            response = await client.post(
+                RoutingService.ORS_ROUTE_URL,
+                json=payload,
+                headers=headers
+            )
+
+        if response.status_code >= 400:
+            raise RuntimeError(
+                "OpenRouteService route request failed. "
+                f"Status: {response.status_code}. "
+                f"Response: {response.text[:500]}"
+            )
 
         data = response.json()
 
-        ors_route = data["routes"][0]
-
-        geometry = RouteUtils.decode_route(
-            ors_route["geometry"]
+        return RoutingService.parse_geojson_route(
+            data
         )
 
-        route = Route(
+    @staticmethod
+    def parse_geojson_route(data):
+        features = data.get(
+            "features",
+            []
+        )
 
-            encoded_geometry=ors_route["geometry"],
+        if not features:
+            raise RuntimeError(
+                "OpenRouteService returned no route features."
+            )
 
+        feature = features[0]
+
+        geometry = (
+            feature.get(
+                "geometry",
+                {}
+            ).get(
+                "coordinates",
+                []
+            )
+        )
+
+        properties = feature.get(
+            "properties",
+            {}
+        )
+
+        summary = properties.get(
+            "summary",
+            {}
+        )
+
+        distance_meters = summary.get(
+            "distance",
+            0.0
+        )
+
+        duration_seconds = summary.get(
+            "duration",
+            0.0
+        )
+
+        distance_km = (
+            float(distance_meters) /
+            1000
+        )
+
+        duration_minutes = (
+            float(duration_seconds) /
+            60
+        )
+
+        return RoutingService.build_route(
+            distance_km=distance_km,
+            duration_minutes=duration_minutes,
             geometry=geometry,
-
-            distance_km=ors_route["summary"]["distance"] / 1000,
-
-            duration_minutes=ors_route["summary"]["duration"] / 60,
-
-            raw=ors_route
-
+            raw=data
         )
 
-        return SegmentService.build(route)
+    @staticmethod
+    def build_route(
+        distance_km,
+        duration_minutes,
+        geometry,
+        raw
+    ):
+        return Route(
+            distance_km=distance_km,
+            geometry=geometry,
+            encoded_geometry="",
+            duration_minutes=duration_minutes,
+            raw=raw
+        )
+
+    @staticmethod
+    def get_api_key():
+        possible_names = [
+            "OPENROUTESERVICE_API_KEY",
+            "ORS_API_KEY",
+            "OPEN_ROUTE_SERVICE_API_KEY",
+            "OPENROUTE_API_KEY"
+        ]
+
+        for name in possible_names:
+            value = os.getenv(
+                name
+            )
+
+            if value:
+                return value
+
+        raise RuntimeError(
+            "OpenRouteService API key is missing. "
+            "Set OPENROUTESERVICE_API_KEY or ORS_API_KEY in your .env file."
+        )

@@ -125,6 +125,35 @@ class LearningSummaryResponse(BaseModel):
     average_prediction_error_percent: float | None = None
 
 
+class MapMarkerResponse(BaseModel):
+    type: str
+    label: str
+
+    latitude: float
+    longitude: float
+
+    stop: int | None = None
+    route_leg: int | None = None
+
+    charger_name: str | None = None
+    network: str | None = None
+    power_kw: float | None = None
+
+
+class MapBoundsResponse(BaseModel):
+    min_latitude: float
+    max_latitude: float
+    min_longitude: float
+    max_longitude: float
+
+
+class MapResponse(BaseModel):
+    route_geometry_format: str
+    route_geometry: list[list[float]]
+    markers: list[MapMarkerResponse]
+    bounds: MapBoundsResponse | None = None
+
+
 class TripSummaryResponse(BaseModel):
     distance_km: float
 
@@ -153,6 +182,7 @@ class TripResponse(BaseModel):
     alternative_plans: AlternativePlansResponse
     alternative_plans_by_leg: list[AlternativePlansForRouteLegResponse] | None = None
     learning: LearningSummaryResponse | None = None
+    map: MapResponse | None = None
     summary: TripSummaryResponse
 
     weather: WeatherResponse | None = None
