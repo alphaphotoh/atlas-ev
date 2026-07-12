@@ -77,6 +77,13 @@ class GraphSearch:
                 candidate.charger.detour_distance_km or 0.0
             )
 
+            PlannerLogger.log(
+                f"Candidate charger: {candidate.charger.name} | "
+                f"arrival SOC: {candidate.arrival_soc:.1f}% | "
+                f"detour: {detour_distance_km:.2f} km | "
+                f"max detour: {node.trip.planning.maximum_detour_km:.2f} km"
+            )
+
             if (
                 detour_distance_km >
                 node.trip.planning.maximum_detour_km
@@ -283,10 +290,19 @@ class GraphSearch:
         if trip is None:
             return 0.0
 
-        if not trip.battery_states:
-            return 0.0
+        if getattr(trip, "battery_states", None):
+            return trip.battery_states[-1].soc
 
-        return trip.battery_states[-1].soc
+        simulation = getattr(
+            trip,
+            "simulation",
+            None
+        )
+
+        if simulation is not None:
+            return simulation.arrival_soc or 0.0
+
+        return 0.0
 
     @staticmethod
     def charger_id(charger):

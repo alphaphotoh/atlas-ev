@@ -15,4 +15,4 @@ class TripPlanningConfig:
     city_charge_limit: float = 80.0
 
     minimum_dc_power_kw: float = 100.0
-    maximum_detour_km: float = 5.0
+    maximum_detour_km: float = 25.0

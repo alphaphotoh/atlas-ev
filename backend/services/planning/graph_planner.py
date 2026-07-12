@@ -427,10 +427,19 @@ class GraphPlanner:
         if node is None:
             return 0.0
 
-        if not node.trip.battery_states:
-            return 0.0
+        if getattr(node.trip, "battery_states", None):
+            return node.trip.battery_states[-1].soc
 
-        return node.trip.battery_states[-1].soc
+        simulation = getattr(
+            node.trip,
+            "simulation",
+            None
+        )
+
+        if simulation is not None:
+            return simulation.arrival_soc or 0.0
+
+        return 0.0
 
     @staticmethod
     def print_node_status(node, trip):

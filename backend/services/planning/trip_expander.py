@@ -1,8 +1,6 @@
 from backend.models.trip_itinerary import TripItinerary
 
 from backend.services.planning.graph_planner import GraphPlanner
-from backend.services.planning.planner_logger import PlannerLogger
-from backend.services.planning.result_printer import ResultPrinter
 
 
 class TripExpander:
@@ -21,14 +19,6 @@ class TripExpander:
         result = await GraphPlanner.plan_with_alternatives(
             trip
         )
-
-        if (
-            result.recommended is not None and
-            PlannerLogger.enabled()
-        ):
-            ResultPrinter.print_itinerary(
-                result.recommended.itinerary
-            )
 
         return result
 
