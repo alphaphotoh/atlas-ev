@@ -5,6 +5,8 @@ from backend.services.planning.trip_expander import TripExpander
 
 
 class JourneyBuilder:
+    INTERMEDIATE_WAYPOINT_TARGET_SOC = 65.0
+
     @staticmethod
     async def build(
         vehicle,
@@ -16,7 +18,11 @@ class JourneyBuilder:
         journey = Journey()
         current_soc = starting_soc
 
-        for waypoint in waypoints:
+        total_legs = len(waypoints)
+
+        for index, waypoint in enumerate(waypoints):
+            is_final_leg = index == total_legs - 1
+
             trip = await TripBuilder.build_trip(
                 vehicle=vehicle,
                 origin=waypoint.origin,
@@ -25,6 +31,12 @@ class JourneyBuilder:
                 average_speed=average_speed,
                 highway_ratio=highway_ratio
             )
+
+            if not is_final_leg:
+                trip.planning.target_destination_soc = max(
+                    trip.planning.target_destination_soc,
+                    JourneyBuilder.INTERMEDIATE_WAYPOINT_TARGET_SOC
+                )
 
             planning_result = await TripExpander.expand_with_result(
                 trip
