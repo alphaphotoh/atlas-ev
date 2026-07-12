@@ -13,6 +13,7 @@ from backend.services.planning.map_response_service import MapResponseService
 class TripService:
     DETOUR_SPEED_KMH = 50
     MAX_ALTERNATIVE_PLANS = 5
+    MIN_SAFE_ARRIVAL_SOC = 10.0
 
     @staticmethod
     async def build_trip(
@@ -142,6 +143,15 @@ class TripService:
                 fallback_soc=arrival_soc_without_charging
             )
 
+            leg_status = TripService.build_leg_status(
+                route_leg_number=index + 1,
+                origin=waypoint.origin,
+                destination=waypoint.destination,
+                arrival_soc_without_charging=arrival_soc_without_charging,
+                arrival_soc_with_charging=arrival_soc_with_charging,
+                charging_stops=leg_charging_stops
+            )
+
             route_legs.append(
                 {
                     "leg": index + 1,
@@ -166,13 +176,19 @@ class TripService:
                         arrival_soc_with_charging,
                         1
                     ),
-                    "charging_required": len(leg_charging_stops) > 0,
+                    "charging_required": leg_status["charging_required"],
+                    "planning_status": leg_status["planning_status"],
+                    "warnings": leg_status["warnings"],
                     "charging_stop_numbers": [
                         stop["stop"]
                         for stop in leg_charging_stops
                     ]
                 }
             )
+
+        trip_planning_status = TripService.build_trip_planning_status(
+            route_legs
+        )
 
         final_arrival_soc = 0.0
 
@@ -202,8 +218,10 @@ class TripService:
             "waypoints": waypoints,
             "route_legs": route_legs,
             "charging_plan": {
-                "charging_required": len(charging_stops) > 0,
+                "charging_required": trip_planning_status["charging_required"],
                 "stops": len(charging_stops),
+                "planning_status": trip_planning_status["planning_status"],
+                "warnings": trip_planning_status["warnings"],
                 "charging_stops": charging_stops,
                 "total_charging_minutes": TripService.round_value(
                     charging_minutes,
@@ -258,7 +276,9 @@ class TripService:
                     final_arrival_soc,
                     1
                 ),
-                "charging_required": len(charging_stops) > 0
+                "charging_required": trip_planning_status["charging_required"],
+                "planning_status": trip_planning_status["planning_status"],
+                "warnings": trip_planning_status["warnings"]
             }
         }
 
@@ -284,6 +304,15 @@ class TripService:
         arrival_soc_with_charging = TripService.itinerary_arrival_soc(
             itinerary=itinerary,
             fallback_soc=arrival_soc_without_charging
+        )
+
+        leg_status = TripService.build_leg_status(
+            route_leg_number=1,
+            origin=origin,
+            destination=destination,
+            arrival_soc_without_charging=arrival_soc_without_charging,
+            arrival_soc_with_charging=arrival_soc_with_charging,
+            charging_stops=charging_stops
         )
 
         charging_minutes = TripService.total_charging_minutes(
@@ -358,7 +387,9 @@ class TripService:
                         arrival_soc_with_charging,
                         1
                     ),
-                    "charging_required": len(charging_stops) > 0,
+                    "charging_required": leg_status["charging_required"],
+                    "planning_status": leg_status["planning_status"],
+                    "warnings": leg_status["warnings"],
                     "charging_stop_numbers": [
                         stop["stop"]
                         for stop in charging_stops
@@ -366,8 +397,10 @@ class TripService:
                 }
             ],
             "charging_plan": {
-                "charging_required": len(charging_stops) > 0,
+                "charging_required": leg_status["charging_required"],
                 "stops": len(charging_stops),
+                "planning_status": leg_status["planning_status"],
+                "warnings": leg_status["warnings"],
                 "charging_stops": charging_stops,
                 "total_charging_minutes": TripService.round_value(
                     charging_minutes,
@@ -436,9 +469,146 @@ class TripService:
                     arrival_soc_with_charging,
                     1
                 ),
-                "charging_required": len(charging_stops) > 0
+                "charging_required": leg_status["charging_required"],
+                "planning_status": leg_status["planning_status"],
+                "warnings": leg_status["warnings"]
             }
         }
+
+    @staticmethod
+    def build_leg_status(
+        route_leg_number,
+        origin,
+        destination,
+        arrival_soc_without_charging,
+        arrival_soc_with_charging,
+        charging_stops
+    ):
+        warnings = []
+
+        charging_required = TripService.is_leg_charging_required(
+            arrival_soc_without_charging=arrival_soc_without_charging,
+            charging_stops=charging_stops
+        )
+
+        has_charging_stops = len(
+            charging_stops
+        ) > 0
+
+        arrival_soc_with_charging_value = TripService.safe_float(
+            arrival_soc_with_charging,
+            0.0
+        )
+
+        if not charging_required:
+            planning_status = "ok"
+
+        elif not has_charging_stops:
+            planning_status = "no_feasible_charging_plan_found"
+
+            warnings.append(
+                (
+                    f"Route leg {route_leg_number} "
+                    f"({origin} to {destination}) requires charging "
+                    "but no feasible charging stop was found."
+                )
+            )
+
+        elif arrival_soc_with_charging_value <= 0:
+            planning_status = "no_feasible_charging_plan_found"
+
+            warnings.append(
+                (
+                    f"Route leg {route_leg_number} "
+                    f"({origin} to {destination}) has charging planned "
+                    "but still arrives at or below 0% SOC."
+                )
+            )
+
+        else:
+            planning_status = "charging_planned"
+
+        return {
+            "charging_required": charging_required,
+            "planning_status": planning_status,
+            "warnings": warnings
+        }
+
+    @staticmethod
+    def is_leg_charging_required(
+        arrival_soc_without_charging,
+        charging_stops
+    ):
+        if charging_stops:
+            return True
+
+        arrival_soc = TripService.safe_float(
+            arrival_soc_without_charging,
+            0.0
+        )
+
+        return (
+            arrival_soc <=
+            TripService.MIN_SAFE_ARRIVAL_SOC
+        )
+
+    @staticmethod
+    def build_trip_planning_status(route_legs):
+        charging_required = False
+        has_infeasible_leg = False
+        warnings = []
+
+        for route_leg in route_legs:
+            if route_leg.get(
+                "charging_required",
+                False
+            ):
+                charging_required = True
+
+            if (
+                route_leg.get("planning_status") ==
+                "no_feasible_charging_plan_found"
+            ):
+                has_infeasible_leg = True
+
+            warnings.extend(
+                route_leg.get(
+                    "warnings",
+                    []
+                )
+            )
+
+        if has_infeasible_leg:
+            planning_status = "incomplete_no_feasible_charging_plan"
+
+        elif charging_required:
+            planning_status = "charging_planned"
+
+        else:
+            planning_status = "ok"
+
+        return {
+            "charging_required": charging_required,
+            "planning_status": planning_status,
+            "warnings": warnings
+        }
+
+    @staticmethod
+    def safe_float(
+        value,
+        default_value=0.0
+    ):
+        if value is None:
+            return default_value
+
+        try:
+            return float(
+                value
+            )
+
+        except (TypeError, ValueError):
+            return default_value
+
 
     @staticmethod
     def build_journey_learning_response(journey):

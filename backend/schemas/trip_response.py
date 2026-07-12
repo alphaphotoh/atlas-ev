@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class WeatherResponse(BaseModel):
@@ -37,6 +37,8 @@ class RouteLegResponse(BaseModel):
     arrival_soc_without_charging: float
     arrival_soc_with_charging: float
     charging_required: bool
+    planning_status: str | None = None
+    warnings: list[str] = Field(default_factory=list)
     charging_stop_numbers: list[int]
 
 
@@ -76,6 +78,8 @@ class ChargingPlanResponse(BaseModel):
     charging_stops: list[ChargingStopResponse]
     total_charging_minutes: float
     total_detour_minutes: float
+    planning_status: str | None = None
+    warnings: list[str] = Field(default_factory=list)
 
 
 class AlternativePlanResponse(BaseModel):
@@ -165,6 +169,8 @@ class TripSummaryResponse(BaseModel):
     energy_kwh: float
     final_arrival_soc: float
     charging_required: bool
+    planning_status: str | None = None
+    warnings: list[str] = Field(default_factory=list)
 
     predicted_efficiency: float | None = None
     estimated_arrival_soc_without_charging: float | None = None
