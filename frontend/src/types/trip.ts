@@ -1,0 +1,73 @@
+export interface TripRequest {
+  vehicle: string;
+  origin: string;
+  waypoints: string[];
+  destination: string;
+  starting_soc: number;
+  average_speed: number;
+  highway_ratio: number;
+}
+
+export interface MapMarker {
+  type: string;
+  label: string;
+  latitude: number;
+  longitude: number;
+  stop?: number;
+  route_leg?: number;
+  charger_name?: string;
+  network?: string;
+  power_kw?: number;
+}
+
+export interface MapBounds {
+  min_latitude: number;
+  max_latitude: number;
+  min_longitude: number;
+  max_longitude: number;
+}
+
+export interface TripMapData {
+  route_geometry_format: string;
+  route_geometry: number[][];
+  markers: MapMarker[];
+  bounds?: MapBounds;
+}
+
+export interface TripSummary {
+  distance_km: number;
+  driving_minutes: number;
+  charging_minutes: number;
+  detour_minutes: number;
+  total_trip_minutes: number;
+  energy_kwh: number;
+  final_arrival_soc: number;
+  charging_required: boolean;
+  planning_status: string;
+  warnings: string[];
+}
+
+export interface ChargingStop {
+  stop: number;
+  route_leg?: number;
+  charger_name: string;
+  network?: string;
+  latitude: number;
+  longitude: number;
+  arrival_soc: number;
+  departure_soc: number;
+  charge_added_kwh: number;
+  charging_time_minutes: number;
+  power_kw?: number;
+  detour_distance_km?: number;
+}
+
+export interface TripResponse {
+  vehicle: string;
+  origin: string;
+  destination: string;
+  waypoints?: string[];
+  charging_stops: ChargingStop[];
+  map?: TripMapData;
+  summary: TripSummary;
+}
