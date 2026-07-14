@@ -108,7 +108,10 @@ function App() {
 
       {trip && (
         <>
-          <TripSummary summary={trip.summary} />
+          <TripSummary
+            summary={trip.summary}
+            waypointMode={trip.waypoint_mode}
+          />
           <RouteLegs legs={trip.route_legs} />
           <ChargingStops stops={chargingStops} />
           <TripMap mapData={trip.map} />

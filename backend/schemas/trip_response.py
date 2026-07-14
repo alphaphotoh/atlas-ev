@@ -181,7 +181,8 @@ class TripResponse(BaseModel):
     vehicle: str
     origin: str
     destination: str
-    waypoints: list[str]
+    waypoints: list[str] | None = None
+    waypoint_mode: str | None = None
 
     route_legs: list[RouteLegResponse]
     charging_plan: ChargingPlanResponse

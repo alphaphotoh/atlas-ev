@@ -447,3 +447,30 @@ select:focus {
   outline: 2px solid rgba(40, 82, 122, 0.2);
   border-color: #28527a;
 }
+
+.summary-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.mode-pill {
+  background: #eef2f7;
+  color: #172033;
+  border: 1px solid #d5dce8;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.mode-note {
+  background: #f8fafc;
+  border: 1px solid #e5eaf2;
+  border-radius: 14px;
+  padding: 12px 14px;
+  color: #687386;
+  margin-bottom: 18px;
+  font-weight: 600;
+}

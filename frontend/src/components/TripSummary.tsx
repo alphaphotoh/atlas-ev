@@ -1,11 +1,48 @@
-import type { TripSummary as TripSummaryType } from "../types/trip";
+import type { TripSummary as TripSummaryType, WaypointMode } from "../types/trip";
 
 interface TripSummaryProps {
   summary?: TripSummaryType;
+  waypointMode?: WaypointMode;
+}
+
+function formatHours(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const mins = Math.round(minutes % 60);
+
+  if (hours <= 0) {
+    return `${mins} min`;
+  }
+
+  return `${hours} hr ${mins} min`;
+}
+
+function waypointModeLabel(waypointMode?: WaypointMode) {
+  if (waypointMode === "via_points") {
+    return "Via points only";
+  }
+
+  if (waypointMode === "required_stops") {
+    return "Required stops";
+  }
+
+  return "Not specified";
+}
+
+function waypointModeDescription(waypointMode?: WaypointMode) {
+  if (waypointMode === "via_points") {
+    return "Waypoints shape the route but do not force SOC targets.";
+  }
+
+  if (waypointMode === "required_stops") {
+    return "Waypoints are treated as separate trip legs.";
+  }
+
+  return "Waypoint mode was not returned by the backend.";
 }
 
 export function TripSummary({
-  summary
+  summary,
+  waypointMode
 }: TripSummaryProps) {
   if (!summary) {
     return null;
@@ -13,7 +50,28 @@ export function TripSummary({
 
   return (
     <section className="card">
-      <h2>Trip Summary</h2>
+      <div className="section-header">
+        <div>
+          <h2>Trip Summary</h2>
+          <p>
+            Status: <strong>{summary.planning_status}</strong>
+          </p>
+        </div>
+
+        <div className="summary-badges">
+          <div className="mode-pill">
+            {waypointModeLabel(waypointMode)}
+          </div>
+
+          <div className="status-pill">
+            {summary.charging_required ? "Charging planned" : "No charge needed"}
+          </div>
+        </div>
+      </div>
+
+      <div className="mode-note">
+        {waypointModeDescription(waypointMode)}
+      </div>
 
       <div className="summary-grid">
         <div>
@@ -22,13 +80,18 @@ export function TripSummary({
         </div>
 
         <div>
+          <span>Total Time</span>
+          <strong>{formatHours(summary.total_trip_minutes)}</strong>
+        </div>
+
+        <div>
           <span>Driving</span>
-          <strong>{summary.driving_minutes.toFixed(0)} min</strong>
+          <strong>{formatHours(summary.driving_minutes)}</strong>
         </div>
 
         <div>
           <span>Charging</span>
-          <strong>{summary.charging_minutes.toFixed(1)} min</strong>
+          <strong>{formatHours(summary.charging_minutes)}</strong>
         </div>
 
         <div>
@@ -37,12 +100,7 @@ export function TripSummary({
         </div>
 
         <div>
-          <span>Total Time</span>
-          <strong>{summary.total_trip_minutes.toFixed(1)} min</strong>
-        </div>
-
-        <div>
-          <span>Energy</span>
+          <span>Energy Used</span>
           <strong>{summary.energy_kwh.toFixed(1)} kWh</strong>
         </div>
 
@@ -52,8 +110,8 @@ export function TripSummary({
         </div>
 
         <div>
-          <span>Status</span>
-          <strong>{summary.planning_status}</strong>
+          <span>Warnings</span>
+          <strong>{summary.warnings.length}</strong>
         </div>
       </div>
 
