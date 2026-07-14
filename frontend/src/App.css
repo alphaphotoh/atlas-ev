@@ -431,3 +431,19 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+select {
+  width: 100%;
+  border: 1px solid #d5dce8;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  color: #172033;
+  font: inherit;
+  font-weight: 700;
+}
+
+select:focus {
+  outline: 2px solid rgba(40, 82, 122, 0.2);
+  border-color: #28527a;
+}

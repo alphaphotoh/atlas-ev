@@ -47,14 +47,84 @@ class TripBuilder:
             destination_data["features"][0]["geometry"]["coordinates"]
         )
 
-        weather = await WeatherService.get_weather(
-            latitude=origin_coords[1],
-            longitude=origin_coords[0]
-        )
-
         route = await RoutingService.get_route(
             origin_coords,
             destination_coords
+        )
+
+        return await TripBuilder.build_from_route(
+            vehicle=vehicle,
+            route=route,
+            origin_coords=origin_coords,
+            starting_soc=starting_soc,
+            average_speed=average_speed,
+            highway_ratio=highway_ratio
+        )
+
+    @staticmethod
+    async def build_trip_via_points(
+        vehicle,
+        origin,
+        waypoints,
+        destination,
+        starting_soc,
+        average_speed,
+        highway_ratio
+    ):
+        origin_data = await GeocodingService.search(
+            origin
+        )
+
+        destination_data = await GeocodingService.search(
+            destination
+        )
+
+        origin_coords = (
+            origin_data["features"][0]["geometry"]["coordinates"]
+        )
+
+        destination_coords = (
+            destination_data["features"][0]["geometry"]["coordinates"]
+        )
+
+        waypoint_coordinates = []
+
+        for waypoint in waypoints:
+            waypoint_data = await GeocodingService.search(
+                waypoint
+            )
+
+            waypoint_coordinates.append(
+                waypoint_data["features"][0]["geometry"]["coordinates"]
+            )
+
+        route = await RoutingService.get_route_via_waypoints(
+            start=origin_coords,
+            waypoint_coordinates=waypoint_coordinates,
+            end=destination_coords
+        )
+
+        return await TripBuilder.build_from_route(
+            vehicle=vehicle,
+            route=route,
+            origin_coords=origin_coords,
+            starting_soc=starting_soc,
+            average_speed=average_speed,
+            highway_ratio=highway_ratio
+        )
+
+    @staticmethod
+    async def build_from_route(
+        vehicle,
+        route,
+        origin_coords,
+        starting_soc,
+        average_speed,
+        highway_ratio
+    ):
+        weather = await WeatherService.get_weather(
+            latitude=origin_coords[1],
+            longitude=origin_coords[0]
         )
 
         trip = TripPlan(

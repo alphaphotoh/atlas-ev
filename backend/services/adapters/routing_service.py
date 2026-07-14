@@ -17,13 +17,21 @@ class RoutingService:
         start,
         end
     ):
+        return await RoutingService.get_route_with_coordinates(
+            coordinates=[
+                start,
+                end
+            ]
+        )
+
+    @staticmethod
+    async def get_route_with_coordinates(
+        coordinates
+    ):
         api_key = RoutingService.get_api_key()
 
         payload = {
-            "coordinates": [
-                start,
-                end
-            ],
+            "coordinates": coordinates,
             "instructions": False,
             "geometry": True
         }
@@ -54,6 +62,28 @@ class RoutingService:
 
         return RoutingService.parse_geojson_route(
             data
+        )
+
+    @staticmethod
+    async def get_route_via_waypoints(
+        start,
+        waypoint_coordinates,
+        end
+    ):
+        coordinates = [
+            start
+        ]
+
+        coordinates.extend(
+            waypoint_coordinates
+        )
+
+        coordinates.append(
+            end
+        )
+
+        return await RoutingService.get_route_with_coordinates(
+            coordinates=coordinates
         )
 
     @staticmethod

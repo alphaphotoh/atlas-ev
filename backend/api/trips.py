@@ -38,7 +38,8 @@ async def plan_trip(request: TripRequest):
         destination=request.destination,
         starting_soc=request.starting_soc,
         average_speed=request.average_speed,
-        highway_ratio=request.highway_ratio
+        highway_ratio=request.highway_ratio,
+        waypoint_mode=request.waypoint_mode
     )
 
 

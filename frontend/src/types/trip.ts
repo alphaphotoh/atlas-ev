@@ -1,7 +1,10 @@
+export type WaypointMode = "required_stops" | "via_points";
+
 export interface TripRequest {
   vehicle: string;
   origin: string;
   waypoints: string[];
+  waypoint_mode: WaypointMode;
   destination: string;
   starting_soc: number;
   average_speed: number;
@@ -101,6 +104,7 @@ export interface TripResponse {
   origin: string;
   destination: string;
   waypoints?: string[];
+  waypoint_mode?: WaypointMode;
   route_legs?: RouteLeg[];
   charging_stops?: ChargingStop[];
   charging_plan?: ChargingPlan;

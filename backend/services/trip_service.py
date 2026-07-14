@@ -23,9 +23,42 @@ class TripService:
         destination: str,
         starting_soc: float,
         average_speed: float,
-        highway_ratio: float
+        highway_ratio: float,
+        waypoint_mode: str = "required_stops"
     ):
         vehicle = VehicleRegistry.get(vehicle_id)
+        waypoint_mode = TripService.normalize_waypoint_mode(
+            waypoint_mode
+        )
+
+        if waypoints and waypoint_mode == "via_points":
+            trip = await TripBuilder.build_trip_via_points(
+                vehicle=vehicle,
+                origin=origin,
+                waypoints=waypoints,
+                destination=destination,
+                starting_soc=starting_soc,
+                average_speed=average_speed,
+                highway_ratio=highway_ratio
+            )
+
+            planning_result = await TripExpander.expand_with_result(
+                trip
+            )
+
+            itinerary = TripExpander.itinerary_from_result(
+                planning_result
+            )
+
+            return TripService.build_single_trip_response(
+                origin=origin,
+                waypoints=waypoints,
+                destination=destination,
+                trip=trip,
+                itinerary=itinerary,
+                planning_result=planning_result,
+                waypoint_mode=waypoint_mode
+            )
 
         trip_waypoints = WaypointService.build(
             origin=origin,
@@ -48,7 +81,8 @@ class TripService:
                 waypoints=waypoints,
                 destination=destination,
                 trip_waypoints=trip_waypoints,
-                journey=journey
+                journey=journey,
+                waypoint_mode=waypoint_mode
             )
 
         trip = await TripBuilder.build_trip(
@@ -74,7 +108,8 @@ class TripService:
             destination=destination,
             trip=trip,
             itinerary=itinerary,
-            planning_result=planning_result
+            planning_result=planning_result,
+            waypoint_mode=waypoint_mode
         )
 
     @staticmethod
@@ -84,7 +119,8 @@ class TripService:
         waypoints,
         destination,
         trip_waypoints,
-        journey
+        journey,
+        waypoint_mode="required_stops"
     ):
         route_legs = []
         charging_stops = []
@@ -289,7 +325,8 @@ class TripService:
         destination,
         trip,
         itinerary,
-        planning_result
+        planning_result,
+        waypoint_mode="required_stops"
     ):
         charging_stops = TripService.build_charging_stops(
             itinerary=itinerary,
@@ -353,7 +390,7 @@ class TripService:
             "vehicle": trip.vehicle.name,
             "origin": origin,
             "destination": destination,
-            "waypoints": waypoints,
+            "waypoints": waypoint_mode,
             "weather": TripService.build_weather_response(
                 trip
             ),
@@ -1184,6 +1221,13 @@ class TripService:
             detour_km /
             TripService.DETOUR_SPEED_KMH
         ) * 60
+
+    @staticmethod
+    def normalize_waypoint_mode(waypoint_mode):
+        if waypoint_mode == "via_points":
+            return "via_points"
+
+        return "required_stops"
 
     @staticmethod
     def round_value(value, digits=1):

@@ -1,8 +1,9 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 
 class TripRequest(BaseModel):
-
     vehicle: str = "vf9"
 
     origin: str
@@ -10,6 +11,11 @@ class TripRequest(BaseModel):
     destination: str
 
     waypoints: list[str] = []
+
+    waypoint_mode: Literal[
+        "required_stops",
+        "via_points"
+    ] = "required_stops"
 
     starting_soc: float
 
