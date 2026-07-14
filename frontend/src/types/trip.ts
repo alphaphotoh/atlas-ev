@@ -8,6 +8,21 @@ export interface TripRequest {
   highway_ratio: number;
 }
 
+export interface RouteLeg {
+  leg: number;
+  origin: string;
+  destination: string;
+  distance_km: number;
+  duration_minutes: number;
+  energy_kwh: number;
+  arrival_soc_without_charging: number;
+  arrival_soc_with_charging: number;
+  charging_required: boolean;
+  planning_status: string;
+  warnings: string[];
+  charging_stop_numbers: number[];
+}
+
 export interface MapMarker {
   type: string;
   label: string;
@@ -86,6 +101,7 @@ export interface TripResponse {
   origin: string;
   destination: string;
   waypoints?: string[];
+  route_legs?: RouteLeg[];
   charging_stops?: ChargingStop[];
   charging_plan?: ChargingPlan;
   map?: TripMapData;
