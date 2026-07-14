@@ -48,18 +48,37 @@ export interface TripSummary {
 }
 
 export interface ChargingStop {
-  stop: number;
+  stop?: number;
+  number?: number;
   route_leg?: number;
-  charger_name: string;
+
+  charger_name?: string;
+  name?: string;
   network?: string;
+
   latitude: number;
   longitude: number;
-  arrival_soc: number;
-  departure_soc: number;
-  charge_added_kwh: number;
-  charging_time_minutes: number;
+
+  arrival_soc?: number;
+  departure_soc?: number;
+
+  charge_added_kwh?: number;
+  energy_added_kwh?: number;
+
+  charging_time_minutes?: number;
+  charging_minutes?: number;
+  charge_time_minutes?: number;
+  duration_minutes?: number;
+
   power_kw?: number;
+
   detour_distance_km?: number;
+  detour_km?: number;
+}
+
+export interface ChargingPlan {
+  stops?: ChargingStop[];
+  charging_stops?: ChargingStop[];
 }
 
 export interface TripResponse {
@@ -67,7 +86,8 @@ export interface TripResponse {
   origin: string;
   destination: string;
   waypoints?: string[];
-  charging_stops: ChargingStop[];
+  charging_stops?: ChargingStop[];
+  charging_plan?: ChargingPlan;
   map?: TripMapData;
   summary: TripSummary;
 }

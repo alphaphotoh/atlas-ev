@@ -53,6 +53,10 @@ class GraphSearch:
         rejected_visited = 0
         candidate_build_errors = 0
 
+        min_arrival_soc = GraphSearch.minimum_arrival_soc(
+            node.trip.planning
+        )
+
         for charger in chargers:
             try:
                 candidate = CandidateBuilder.build(
@@ -66,10 +70,7 @@ class GraphSearch:
                 PlannerLogger.log(error)
                 continue
 
-            if (
-                candidate.arrival_soc <
-                node.trip.planning.minimum_charger_arrival_soc
-            ):
+            if candidate.arrival_soc < min_arrival_soc:
                 rejected_low_arrival_soc += 1
                 continue
 
@@ -303,6 +304,18 @@ class GraphSearch:
             return simulation.arrival_soc or 0.0
 
         return 0.0
+
+    @staticmethod
+    def minimum_arrival_soc(planning):
+        return getattr(
+            planning,
+            "minimum_charger_arrival_soc",
+            getattr(
+                planning,
+                "min_arrival_soc",
+                10.0
+            )
+        )
 
     @staticmethod
     def charger_id(charger):

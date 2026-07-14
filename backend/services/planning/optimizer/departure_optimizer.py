@@ -1,15 +1,9 @@
 from backend.services.planning.trip_builder import TripBuilder
+from backend.services.simulation.charge_curve import ChargeCurve
 
 
 class DepartureOptimizer:
-    PRECISION_SOC = 0.5
-
-    INTERMEDIATE_CHARGE_LEVELS = (
-        80.0,
-        90.0,
-        95.0,
-        100.0,
-    )
+    DEFAULT_CURVE = ChargeCurve.default_vf9()
 
     @staticmethod
     async def optimize(trip, charger, arrival_soc):
@@ -26,27 +20,26 @@ class DepartureOptimizer:
 
     @staticmethod
     async def optimize_options(trip, charger, arrival_soc):
-        target_soc = trip.planning.target_destination_soc
-        limit_soc = trip.planning.road_trip_charge_limit
+        planning = trip.planning
 
-        low_soc = max(
-            arrival_soc,
-            trip.planning.ideal_charger_arrival_soc_min,
+        target_soc = DepartureOptimizer.destination_target_soc(
+            trip
+        )
+
+        limit_soc = DepartureOptimizer.limit_soc(
+            planning
+        )
+
+        low_soc = DepartureOptimizer.round_soc(
+            max(
+                arrival_soc,
+                0.0
+            )
         )
 
         low_soc = min(
             low_soc,
-            limit_soc,
-        )
-
-        low_soc = round(
-            low_soc,
-            1,
-        )
-
-        high_soc = round(
-            limit_soc,
-            1,
+            limit_soc
         )
 
         low_trip = await TripBuilder.build(
@@ -66,76 +59,63 @@ class DepartureOptimizer:
         high_trip = await TripBuilder.build(
             trip=trip,
             charger=charger,
-            departure_soc=high_soc,
+            departure_soc=limit_soc,
         )
 
-        if DepartureOptimizer.destination_soc(high_trip) < target_soc:
-            return await DepartureOptimizer.intermediate_options(
+        if DepartureOptimizer.destination_soc(high_trip) >= target_soc:
+            return await DepartureOptimizer.final_destination_option(
                 trip=trip,
                 charger=charger,
                 low_soc=low_soc,
-                limit_soc=high_soc,
+                high_soc=limit_soc,
+                target_soc=target_soc,
                 high_trip=high_trip,
             )
 
-        return await DepartureOptimizer.final_destination_option(
+        return await DepartureOptimizer.non_final_options(
             trip=trip,
             charger=charger,
+            arrival_soc=arrival_soc,
             low_soc=low_soc,
-            high_soc=high_soc,
-            target_soc=target_soc,
-            high_trip=high_trip,
+            limit_soc=limit_soc,
         )
 
     @staticmethod
-    async def intermediate_options(
+    async def non_final_options(
         trip,
         charger,
+        arrival_soc,
         low_soc,
         limit_soc,
-        high_trip,
     ):
-        levels = []
+        planning = trip.planning
 
-        for level in DepartureOptimizer.INTERMEDIATE_CHARGE_LEVELS:
-            departure_soc = max(
-                low_soc,
-                level,
-            )
-
-            departure_soc = min(
-                departure_soc,
-                limit_soc,
-            )
-
-            departure_soc = round(
-                departure_soc,
-                1,
-            )
-
-            levels.append(
-                departure_soc,
-            )
-
-        levels.append(
-            round(limit_soc, 1),
+        cap_soc = DepartureOptimizer.non_final_cap_soc(
+            trip=trip,
+            charger=charger,
+            arrival_soc=arrival_soc,
+            limit_soc=limit_soc,
         )
 
-        levels = sorted(
-            set(levels),
+        cap_soc = max(
+            cap_soc,
+            low_soc
+        )
+
+        levels = DepartureOptimizer.non_final_candidate_levels(
+            low_soc=low_soc,
+            cap_soc=cap_soc,
+            planning=planning,
         )
 
         options = []
 
         for departure_soc in levels:
-            if departure_soc == round(limit_soc, 1):
-                next_trip = high_trip
-            else:
-                next_trip = await TripBuilder.build(
-                    trip=trip,
-                    charger=charger,
-                    departure_soc=departure_soc,
-                )
+            next_trip = await TripBuilder.build(
+                trip=trip,
+                charger=charger,
+                departure_soc=departure_soc,
+            )
 
             options.append(
                 (
@@ -147,6 +127,60 @@ class DepartureOptimizer:
         return options
 
     @staticmethod
+    def non_final_candidate_levels(
+        low_soc,
+        cap_soc,
+        planning,
+    ):
+        base_levels = [
+            low_soc,
+            60.0,
+            70.0,
+            75.0,
+            80.0,
+            cap_soc,
+        ]
+
+        default_non_final_cap = getattr(
+            planning,
+            "non_final_charge_cap_soc",
+            85.0
+        )
+
+        if cap_soc >= 85.0:
+            base_levels.append(
+                85.0
+            )
+
+        if cap_soc > default_non_final_cap:
+            base_levels.extend(
+                [
+                    90.0,
+                    95.0,
+                    cap_soc,
+                ]
+            )
+
+        levels = []
+
+        for level in base_levels:
+            if level < low_soc:
+                continue
+
+            if level > cap_soc:
+                continue
+
+            levels.append(
+                DepartureOptimizer.round_soc(
+                    level
+                )
+            )
+
+        return sorted(
+            set(levels)
+        )
+
+    @staticmethod
     async def final_destination_option(
         trip,
         charger,
@@ -155,19 +189,26 @@ class DepartureOptimizer:
         target_soc,
         high_trip,
     ):
+        planning = trip.planning
+
+        precision = getattr(
+            planning,
+            "soc_optimization_precision",
+            0.5
+        )
+
         best_soc = high_soc
         best_trip = high_trip
 
         while (
             high_soc -
             low_soc
-        ) > DepartureOptimizer.PRECISION_SOC:
-            mid_soc = round(
+        ) > precision:
+            mid_soc = DepartureOptimizer.round_soc(
                 (
                     low_soc +
                     high_soc
-                ) / 2,
-                1,
+                ) / 2.0
             )
 
             mid_trip = await TripBuilder.build(
@@ -189,17 +230,150 @@ class DepartureOptimizer:
 
         return [
             (
-                round(best_soc, 1),
+                DepartureOptimizer.round_soc(
+                    best_soc
+                ),
                 best_trip,
             )
         ]
+
+    @staticmethod
+    def non_final_cap_soc(
+        trip,
+        charger,
+        arrival_soc,
+        limit_soc,
+    ):
+        planning = trip.planning
+
+        efficient_cap = DepartureOptimizer.DEFAULT_CURVE.efficient_soc_cap(
+            vehicle=trip.vehicle,
+            charger=charger,
+            planning=planning,
+            arrival_soc=arrival_soc,
+            limit_soc=limit_soc,
+        )
+
+        buffer_soc = DepartureOptimizer.reliability_buffer_soc(
+            trip=trip,
+            charger=charger,
+            planning=planning,
+        )
+
+        return min(
+            limit_soc,
+            efficient_cap + buffer_soc
+        )
+
+    @staticmethod
+    def reliability_buffer_soc(
+        trip,
+        charger,
+        planning,
+    ):
+        buffer_soc = 0.0
+
+        is_sparse = (
+            getattr(
+                trip,
+                "is_sparse_route",
+                False
+            )
+            or
+            getattr(
+                charger,
+                "is_sparse_route",
+                False
+            )
+            or
+            getattr(
+                charger,
+                "sparse_route",
+                False
+            )
+        )
+
+        if is_sparse:
+            buffer_soc += getattr(
+                planning,
+                "sparse_route_buffer_soc",
+                12.0
+            )
+
+        reliability_score = getattr(
+            charger,
+            "reliability_score",
+            None
+        )
+
+        if reliability_score is not None:
+            threshold = getattr(
+                planning,
+                "low_reliability_threshold",
+                0.5
+            )
+
+            if reliability_score < threshold:
+                buffer_soc += getattr(
+                    planning,
+                    "reliability_buffer_soc",
+                    12.0
+                )
+
+        return buffer_soc
+
+    @staticmethod
+    def destination_target_soc(trip):
+        planning = trip.planning
+
+        return getattr(
+            planning,
+            "target_destination_soc",
+            getattr(
+                planning,
+                "destination_target_soc",
+                25.0
+            )
+        )
+
+    @staticmethod
+    def limit_soc(planning):
+        return DepartureOptimizer.round_soc(
+            getattr(
+                planning,
+                "road_trip_charge_limit",
+                100.0
+            )
+        )
 
     @staticmethod
     def destination_soc(trip):
         if not trip:
             return 0.0
 
-        if not trip.battery_states:
-            return 0.0
+        if getattr(trip, "battery_states", None):
+            return trip.battery_states[-1].soc
 
-        return trip.battery_states[-1].soc
+        simulation = getattr(
+            trip,
+            "simulation",
+            None
+        )
+
+        if simulation is not None:
+            return simulation.arrival_soc or 0.0
+
+        return 0.0
+
+    @staticmethod
+    def round_soc(soc):
+        return round(
+            max(
+                0.0,
+                min(
+                    100.0,
+                    float(soc or 0.0)
+                )
+            ),
+            1
+        )
