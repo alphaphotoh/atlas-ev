@@ -1,3 +1,5 @@
+import inspect
+
 from fastapi import APIRouter
 
 from backend.schemas.trip import TripRequest
@@ -31,15 +33,25 @@ async def plan_trip(request: TripRequest):
             None
         )
 
+    kwargs = {
+        "vehicle_id": vehicle_id,
+        "origin": request.origin,
+        "waypoints": request.waypoints,
+        "destination": request.destination,
+        "starting_soc": request.starting_soc,
+        "average_speed": request.average_speed,
+        "highway_ratio": request.highway_ratio
+    }
+
+    signature = inspect.signature(
+        TripService.build_trip
+    )
+
+    if "waypoint_mode" in signature.parameters:
+        kwargs["waypoint_mode"] = request.waypoint_mode
+
     return await TripService.build_trip(
-        vehicle_id=vehicle_id,
-        origin=request.origin,
-        waypoints=request.waypoints,
-        destination=request.destination,
-        starting_soc=request.starting_soc,
-        average_speed=request.average_speed,
-        highway_ratio=request.highway_ratio,
-        waypoint_mode=request.waypoint_mode
+        **kwargs
     )
 
 

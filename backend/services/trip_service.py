@@ -6,9 +6,8 @@ from backend.services.planning.trip_builder import TripBuilder
 from backend.services.planning.trip_expander import TripExpander
 from backend.services.planning.waypoint_service import WaypointService
 from backend.services.planning.journey_builder import JourneyBuilder
-
-from backend.services.learning.learning_service import LearningService
 from backend.services.planning.map_response_service import MapResponseService
+
 
 class TripService:
     DETOUR_SPEED_KMH = 50
@@ -27,6 +26,7 @@ class TripService:
         waypoint_mode: str = "required_stops"
     ):
         vehicle = VehicleRegistry.get(vehicle_id)
+
         waypoint_mode = TripService.normalize_waypoint_mode(
             waypoint_mode
         )
@@ -252,6 +252,7 @@ class TripService:
             "origin": origin,
             "destination": destination,
             "waypoints": waypoints,
+            "waypoint_mode": waypoint_mode,
             "route_legs": route_legs,
             "charging_plan": {
                 "charging_required": trip_planning_status["charging_required"],
@@ -390,7 +391,8 @@ class TripService:
             "vehicle": trip.vehicle.name,
             "origin": origin,
             "destination": destination,
-            "waypoints": waypoint_mode,
+            "waypoints": waypoints,
+            "waypoint_mode": waypoint_mode,
             "weather": TripService.build_weather_response(
                 trip
             ),
@@ -646,7 +648,6 @@ class TripService:
         except (TypeError, ValueError):
             return default_value
 
-
     @staticmethod
     def build_journey_learning_response(journey):
         if journey is None:
@@ -836,6 +837,7 @@ class TripService:
             )
 
             is_recommended = (
+                planning_result.recommended is not None and
                 TripService.itinerary_signature(itinerary) ==
                 TripService.itinerary_signature(
                     planning_result.recommended.itinerary
@@ -887,6 +889,9 @@ class TripService:
     @staticmethod
     def unique_completed_nodes(planning_result):
         nodes = []
+
+        if planning_result is None:
+            return nodes
 
         if planning_result.recommended is not None:
             nodes.append(
