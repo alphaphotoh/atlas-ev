@@ -7,6 +7,9 @@ from backend.services.planning.trip_expander import TripExpander
 from backend.services.planning.waypoint_service import WaypointService
 from backend.services.planning.journey_builder import JourneyBuilder
 from backend.services.planning.map_response_service import MapResponseService
+from backend.services.planning.charger_reliability_service import (
+    ChargerReliabilityService,
+)
 from backend.services.simulation.prediction_impact_service import (
     PredictionImpactService,
 )
@@ -1037,6 +1040,10 @@ class TripService:
 
             charger = candidate.charger
 
+            reliability = ChargerReliabilityService.score_charger(
+                charger
+            )
+
             detour_km = getattr(
                 charger,
                 "detour_distance_km",
@@ -1127,6 +1134,23 @@ class TripService:
                     "score": TripService.round_value(
                         candidate.score,
                         2
+                    ),
+                    "reliability_score": reliability.get(
+                        "reliability_score"
+                    ),
+                    "reliability_label": reliability.get(
+                        "reliability_label"
+                    ),
+                    "availability_status": reliability.get(
+                        "availability_status"
+                    ),
+                    "is_live_availability": reliability.get(
+                        "is_live_availability",
+                        False
+                    ),
+                    "reliability_notes": reliability.get(
+                        "reliability_notes",
+                        []
                     ),
                     "is_final_stop": (
                         index ==

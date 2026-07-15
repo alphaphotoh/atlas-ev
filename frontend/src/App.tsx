@@ -114,7 +114,8 @@ function App() {
           />
           <RouteLegs legs={trip.route_legs} />
           <ChargingStops stops={chargingStops}
-              summary={trip.summary} />
+              summary={trip.summary}
+              alternativePlansByLeg={trip.alternative_plans_by_leg} />
           <TripMap mapData={trip.map} />
         </>
       )}

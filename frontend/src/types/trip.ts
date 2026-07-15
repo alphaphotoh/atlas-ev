@@ -117,27 +117,71 @@ export interface ChargingStop {
   stop?: number;
   number?: number;
   route_leg?: number;
+  planner_leg?: number;
+
   charger_name?: string;
   name?: string;
   network?: string;
+  power_kw?: number | null;
+
   latitude: number;
   longitude: number;
-  arrival_soc?: number;
-  departure_soc?: number;
-  charge_added_kwh?: number;
-  energy_added_kwh?: number;
-  charging_time_minutes?: number;
-  charging_minutes?: number;
-  charge_time_minutes?: number;
-  duration_minutes?: number;
-  power_kw?: number;
-  detour_distance_km?: number;
-  detour_km?: number;
+
+  route_distance_km?: number | null;
+  detour_distance_km?: number | null;
+  detour_km?: number | null;
+  detour_minutes?: number | null;
+
+  arrival_soc?: number | null;
+  departure_soc?: number | null;
+  soc_added?: number | null;
+
+  charge_added_kwh?: number | null;
+  energy_added_kwh?: number | null;
+  charging_time_minutes?: number | null;
+  charging_minutes?: number | null;
+  charge_time_minutes?: number | null;
+  duration_minutes?: number | null;
+
+  destination_soc_if_no_more_charging?: number | null;
+  total_minutes_from_this_stop?: number | null;
+  score?: number | null;
+
+  reliability_score?: number | null;
+  reliability_label?: string | null;
+  availability_status?: string | null;
+  is_live_availability?: boolean;
+  reliability_notes?: string[];
+
+  is_final_stop?: boolean;
 }
 
 export interface ChargingPlan {
   stops?: ChargingStop[];
   charging_stops?: ChargingStop[];
+}
+
+export interface AlternativePlan {
+  plan_id: string;
+  route_leg: number;
+  label: string;
+  is_recommended: boolean;
+  stops: number;
+  charging_stops: ChargingStop[];
+  total_charging_minutes: number;
+  total_detour_minutes: number;
+  estimated_total_minutes: number;
+  final_arrival_soc: number;
+  planner_cost: number;
+}
+
+export interface AlternativePlansForRouteLeg {
+  route_leg: number;
+  origin: string;
+  destination: string;
+  available: boolean;
+  recommended_plan_id?: string | null;
+  plans: AlternativePlan[];
 }
 
 export interface TripResponse {
@@ -149,6 +193,7 @@ export interface TripResponse {
   route_legs?: RouteLeg[];
   charging_stops?: ChargingStop[];
   charging_plan?: ChargingPlan;
+  alternative_plans_by_leg?: AlternativePlansForRouteLeg[] | null;
   map?: TripMapData;
   summary: TripSummary;
 }

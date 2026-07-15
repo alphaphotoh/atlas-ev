@@ -678,3 +678,128 @@ select:focus {
     grid-template-columns: 1fr;
   }
 }
+
+.reliability-panel {
+  margin-top: 16px;
+  border: 1px solid #e5eaf2;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.reliability-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.reliability-header h4 {
+  margin: 0;
+  color: #172033;
+  font-size: 1rem;
+}
+
+.reliability-header p {
+  margin: 4px 0 0;
+  color: #687386;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.reliability-pill {
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 900;
+  white-space: nowrap;
+  border: 1px solid #d5dce8;
+  background: #eef2f7;
+  color: #172033;
+}
+
+.reliability-high {
+  background: #e9f8ef;
+  border-color: #bfe8cc;
+  color: #166534;
+}
+
+.reliability-medium {
+  background: #fff7e6;
+  border-color: #f3d18a;
+  color: #8a5a00;
+}
+
+.reliability-low {
+  background: #fff0f0;
+  border-color: #f0b7b7;
+  color: #a32020;
+}
+
+.reliability-unknown {
+  background: #eef2f7;
+  border-color: #d5dce8;
+  color: #172033;
+}
+
+.reliability-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.reliability-grid > div {
+  border: 1px solid #e5eaf2;
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.reliability-grid span {
+  display: block;
+  color: #28527a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.reliability-grid strong {
+  display: block;
+  color: #172033;
+  font-size: 0.95rem;
+}
+
+.reliability-grid small {
+  display: block;
+  color: #687386;
+  margin-top: 6px;
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.reliability-notes {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.reliability-notes p {
+  margin: 0;
+  border: 1px solid #e5eaf2;
+  border-radius: 12px;
+  background: #fbfdff;
+  padding: 10px;
+  color: #4d596b;
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+
+@media (max-width: 800px) {
+  .reliability-header {
+    flex-direction: column;
+  }
+
+  .reliability-grid {
+    grid-template-columns: 1fr;
+  }
+}

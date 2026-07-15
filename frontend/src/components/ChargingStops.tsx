@@ -1,4 +1,5 @@
 import type {
+  AlternativePlansForRouteLeg,
   ChargingStop,
   TripSummary
 } from "../types/trip";
@@ -6,6 +7,7 @@ import type {
 interface ChargingStopsProps {
   stops: ChargingStop[];
   summary?: TripSummary;
+  alternativePlansByLeg?: AlternativePlansForRouteLeg[] | null;
 }
 
 function getStopNumber(stop: ChargingStop, index: number) {
@@ -83,6 +85,148 @@ function confidenceText(summary?: TripSummary) {
   return `${(confidence * 100).toFixed(0)}%`;
 }
 
+function chargerSignature(stop: ChargingStop) {
+  return [
+    getChargerName(stop).toLowerCase(),
+    stop.latitude?.toFixed(4),
+    stop.longitude?.toFixed(4)
+  ].join("|");
+}
+
+function findBackupCharger(
+  stop: ChargingStop,
+  alternativePlansByLeg?: AlternativePlansForRouteLeg[] | null
+) {
+  const routeLeg = stop.route_leg;
+
+  if (!routeLeg || !alternativePlansByLeg) {
+    return null;
+  }
+
+  const group = alternativePlansByLeg.find(
+    (item) => item.route_leg === routeLeg
+  );
+
+  if (!group || !group.plans) {
+    return null;
+  }
+
+  const currentSignature = chargerSignature(stop);
+
+  for (const plan of group.plans) {
+    if (plan.is_recommended) {
+      continue;
+    }
+
+    for (const candidate of plan.charging_stops ?? []) {
+      if (chargerSignature(candidate) !== currentSignature) {
+        return {
+          stop: candidate,
+          planLabel: plan.label,
+          estimatedTotalMinutes: plan.estimated_total_minutes,
+          finalArrivalSoc: plan.final_arrival_soc
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+function reliabilityClass(label?: string | null) {
+  if (label === "High") {
+    return "reliability-high";
+  }
+
+  if (label === "Medium") {
+    return "reliability-medium";
+  }
+
+  if (label === "Low") {
+    return "reliability-low";
+  }
+
+  return "reliability-unknown";
+}
+
+function ReliabilityPanel({
+  stop,
+  backup
+}: {
+  stop: ChargingStop;
+  backup: ReturnType<typeof findBackupCharger>;
+}) {
+  const label = stop.reliability_label ?? "Unknown";
+  const score = stop.reliability_score;
+  const availability = stop.availability_status ?? "unknown";
+  const liveStatus = stop.is_live_availability
+    ? "Live availability connected"
+    : "Live availability not connected yet";
+
+  return (
+    <div className="reliability-panel">
+      <div className="reliability-header">
+        <div>
+          <h4>Reliability & Backup</h4>
+          <p>
+            Current MVP score uses network, charger power, and route detour.
+          </p>
+        </div>
+
+        <div className={`reliability-pill ${reliabilityClass(label)}`}>
+          {label}
+          {score !== null && score !== undefined ? ` · ${score.toFixed(1)}%` : ""}
+        </div>
+      </div>
+
+      <div className="reliability-grid">
+        <div>
+          <span>Availability</span>
+          <strong>{availability}</strong>
+          <small>{liveStatus}</small>
+        </div>
+
+        <div>
+          <span>Backup Charger</span>
+          {backup ? (
+            <>
+              <strong>{getChargerName(backup.stop)}</strong>
+              <small>
+                {backup.stop.network ?? "Network unknown"} ·{" "}
+                {formatPower(backup.stop.power_kw)}
+              </small>
+            </>
+          ) : (
+            <>
+              <strong>No backup shown</strong>
+              <small>No different alternative charger found for this leg.</small>
+            </>
+          )}
+        </div>
+
+        {backup && (
+          <div>
+            <span>Backup Plan</span>
+            <strong>{backup.planLabel}</strong>
+            <small>
+              Est. total {formatNumber(backup.estimatedTotalMinutes, 1)} min ·
+              final SOC {formatSoc(backup.finalArrivalSoc)}
+            </small>
+          </div>
+        )}
+      </div>
+
+      {stop.reliability_notes && stop.reliability_notes.length > 0 && (
+        <div className="reliability-notes">
+          {stop.reliability_notes.map((note) => (
+            <p key={note}>{note}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChargingDecisionExplanation({
   stop,
   summary
@@ -147,7 +291,8 @@ function ChargingDecisionExplanation({
 
 export function ChargingStops({
   stops,
-  summary
+  summary,
+  alternativePlansByLeg
 }: ChargingStopsProps) {
   if (!stops || stops.length === 0) {
     return (
@@ -172,6 +317,10 @@ export function ChargingStops({
           const chargingMinutes = getChargingMinutes(stop);
           const energyAdded = getEnergyAdded(stop);
           const detourKm = getDetourKm(stop);
+          const backup = findBackupCharger(
+            stop,
+            alternativePlansByLeg
+          );
 
           return (
             <div
@@ -219,6 +368,11 @@ export function ChargingStops({
                   <strong>{formatNumber(detourKm, 1)} km</strong>
                 </div>
               </div>
+
+              <ReliabilityPanel
+                stop={stop}
+                backup={backup}
+              />
 
               <ChargingDecisionExplanation
                 stop={stop}

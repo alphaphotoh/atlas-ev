@@ -69,6 +69,12 @@ class ChargingStopResponse(BaseModel):
     total_minutes_from_this_stop: float
     score: float
 
+    reliability_score: float | None = None
+    reliability_label: str | None = None
+    availability_status: str | None = None
+    is_live_availability: bool = False
+    reliability_notes: list[str] = Field(default_factory=list)
+
     is_final_stop: bool
 
 
