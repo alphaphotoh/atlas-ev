@@ -148,7 +148,7 @@ class TripBuilder:
             )
         )
 
-        predicted_efficiency = (
+        learned_predicted_efficiency = (
             base_predicted_efficiency *
             learning_correction_factor
         )
@@ -156,35 +156,26 @@ class TripBuilder:
         trip.efficiency_profile = EfficiencyProfileService.build(
             route=route,
             environment_samples=trip.environment_samples,
-            base_efficiency=predicted_efficiency
+            base_efficiency=learned_predicted_efficiency
         )
 
         trip.battery_states = BatterySimulator.simulate(
             route=route,
             starting_soc=starting_soc,
             usable_battery_kwh=vehicle.usable_battery_kwh,
-            efficiency=predicted_efficiency,
+            efficiency=learned_predicted_efficiency,
             efficiency_profile=trip.efficiency_profile
         )
 
-        energy_needed = EnergyService.estimate_energy_needed(
-            distance_km=route.distance_km,
-            efficiency=predicted_efficiency
-        )
-
-        arrival_soc = BatteryService.estimate_arrival_soc(
-            starting_soc=starting_soc,
-            usable_battery=vehicle.usable_battery_kwh,
-            energy_used=energy_needed
-        )
-
-        trip.simulation = SimulationContext(
-            predicted_efficiency=predicted_efficiency,
-            energy_needed_kwh=energy_needed,
-            arrival_soc=arrival_soc,
+        trip.simulation = TripBuilder.build_simulation_context(
+            route=route,
+            battery_states=trip.battery_states,
+            fallback_efficiency=learned_predicted_efficiency,
             average_speed=average_speed,
             temperature=weather.temperature_c,
-            highway_ratio=highway_ratio
+            highway_ratio=highway_ratio,
+            starting_soc=starting_soc,
+            usable_battery_kwh=vehicle.usable_battery_kwh
         )
 
         trip.remaining_distance_km = route.distance_km
@@ -196,7 +187,7 @@ class TripBuilder:
 
         trip.learning_correction_factor = learning_correction_factor
         trip.base_predicted_efficiency = base_predicted_efficiency
-        trip.learned_predicted_efficiency = predicted_efficiency
+        trip.learned_predicted_efficiency = learned_predicted_efficiency
 
         return trip
 
@@ -253,30 +244,138 @@ class TripBuilder:
             efficiency_profile=trip.efficiency_profile
         )
 
-        energy_needed = EnergyService.estimate_energy_needed(
-            distance_km=route.distance_km,
-            efficiency=trip.simulation.predicted_efficiency
-        )
-
-        arrival_soc = BatteryService.estimate_arrival_soc(
-            starting_soc=departure_soc,
-            usable_battery=trip.vehicle.usable_battery_kwh,
-            energy_used=energy_needed
-        )
-
-        next_trip.simulation = SimulationContext(
-            predicted_efficiency=trip.simulation.predicted_efficiency,
-            energy_needed_kwh=energy_needed,
-            arrival_soc=arrival_soc,
+        next_trip.simulation = TripBuilder.build_simulation_context(
+            route=route,
+            battery_states=next_trip.battery_states,
+            fallback_efficiency=trip.simulation.predicted_efficiency,
             average_speed=trip.simulation.average_speed,
             temperature=trip.simulation.temperature,
-            highway_ratio=trip.simulation.highway_ratio
+            highway_ratio=trip.simulation.highway_ratio,
+            starting_soc=departure_soc,
+            usable_battery_kwh=trip.vehicle.usable_battery_kwh
         )
 
         next_trip.remaining_distance_km = route.distance_km
         next_trip.starting_soc = departure_soc
 
         return next_trip
+
+    @staticmethod
+    def build_simulation_context(
+        route,
+        battery_states,
+        fallback_efficiency,
+        average_speed,
+        temperature,
+        highway_ratio,
+        starting_soc,
+        usable_battery_kwh
+    ):
+        if battery_states:
+            energy_needed = TripBuilder.energy_used_from_battery_states(
+                battery_states=battery_states
+            )
+
+            arrival_soc = TripBuilder.arrival_soc_from_battery_states(
+                battery_states=battery_states
+            )
+
+            predicted_efficiency = TripBuilder.effective_efficiency_from_battery_states(
+                battery_states=battery_states,
+                route_distance_km=route.distance_km,
+                fallback_efficiency=fallback_efficiency
+            )
+
+        else:
+            energy_needed = EnergyService.estimate_energy_needed(
+                distance_km=route.distance_km,
+                efficiency=fallback_efficiency
+            )
+
+            arrival_soc = BatteryService.estimate_arrival_soc(
+                starting_soc=starting_soc,
+                usable_battery=usable_battery_kwh,
+                energy_used=energy_needed
+            )
+
+            predicted_efficiency = fallback_efficiency
+
+        return SimulationContext(
+            predicted_efficiency=predicted_efficiency,
+            energy_needed_kwh=round(
+                energy_needed,
+                3
+            ),
+            arrival_soc=round(
+                arrival_soc,
+                3
+            ),
+            average_speed=average_speed,
+            temperature=temperature,
+            highway_ratio=highway_ratio
+        )
+
+    @staticmethod
+    def energy_used_from_battery_states(
+        battery_states
+    ):
+        if not battery_states:
+            return 0.0
+
+        energy_used = sum(
+            getattr(
+                state,
+                "energy_used_kwh",
+                0.0
+            ) or 0.0
+            for state in battery_states
+        )
+
+        return round(
+            energy_used,
+            3
+        )
+
+    @staticmethod
+    def arrival_soc_from_battery_states(
+        battery_states
+    ):
+        if not battery_states:
+            return 0.0
+
+        return round(
+            battery_states[-1].soc,
+            3
+        )
+
+    @staticmethod
+    def effective_efficiency_from_battery_states(
+        battery_states,
+        route_distance_km,
+        fallback_efficiency
+    ):
+        if not battery_states:
+            return fallback_efficiency
+
+        if not route_distance_km:
+            return fallback_efficiency
+
+        if route_distance_km <= 0:
+            return fallback_efficiency
+
+        energy_used = TripBuilder.energy_used_from_battery_states(
+            battery_states=battery_states
+        )
+
+        efficiency = (
+            energy_used /
+            route_distance_km
+        ) * 100
+
+        return round(
+            efficiency,
+            3
+        )
 
     @staticmethod
     async def build_route(
