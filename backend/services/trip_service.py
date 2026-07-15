@@ -7,6 +7,12 @@ from backend.services.planning.trip_expander import TripExpander
 from backend.services.planning.waypoint_service import WaypointService
 from backend.services.planning.journey_builder import JourneyBuilder
 from backend.services.planning.map_response_service import MapResponseService
+from backend.services.simulation.prediction_impact_service import (
+    PredictionImpactService,
+)
+from backend.services.simulation.uncertainty_service import (
+    UncertaintyService,
+)
 
 
 class TripService:
@@ -315,7 +321,14 @@ class TripService:
                 ),
                 "charging_required": trip_planning_status["charging_required"],
                 "planning_status": trip_planning_status["planning_status"],
-                "warnings": trip_planning_status["warnings"]
+                "warnings": trip_planning_status["warnings"],
+                "prediction_impact": TripService.build_journey_prediction_impact_response(
+                    journey
+                ),
+                "soc_uncertainty": TripService.build_journey_soc_uncertainty_response(
+                    journey=journey,
+                    estimated_arrival_soc_percent=final_arrival_soc
+                )
             }
         }
 
@@ -510,7 +523,14 @@ class TripService:
                 ),
                 "charging_required": leg_status["charging_required"],
                 "planning_status": leg_status["planning_status"],
-                "warnings": leg_status["warnings"]
+                "warnings": leg_status["warnings"],
+                "prediction_impact": TripService.build_prediction_impact_response(
+                    trip
+                ),
+                "soc_uncertainty": TripService.build_soc_uncertainty_response(
+                    trip=trip,
+                    estimated_arrival_soc_percent=arrival_soc_with_charging
+                )
             }
         }
 
@@ -1116,6 +1136,422 @@ class TripService:
             )
 
         return stops
+
+
+
+    @staticmethod
+    def build_soc_uncertainty_response(
+        trip,
+        estimated_arrival_soc_percent
+    ):
+        if trip is None:
+            return None
+
+        route = getattr(
+            trip,
+            "route",
+            None
+        )
+
+        simulation = getattr(
+            trip,
+            "simulation",
+            None
+        )
+
+        vehicle = getattr(
+            trip,
+            "vehicle",
+            None
+        )
+
+        if route is None or simulation is None or vehicle is None:
+            return None
+
+        learning = TripService.build_learning_response(
+            trip
+        )
+
+        learning_confidence_score = 0.0
+
+        if learning:
+            learning_confidence_score = learning.get(
+                "confidence_score",
+                0.0
+            ) or 0.0
+
+        uncertainty = UncertaintyService.build(
+            estimated_arrival_soc_percent=estimated_arrival_soc_percent,
+            usable_battery_kwh=getattr(
+                vehicle,
+                "usable_battery_kwh",
+                None
+            ),
+            energy_used_kwh=getattr(
+                simulation,
+                "energy_needed_kwh",
+                None
+            ),
+            distance_km=getattr(
+                route,
+                "distance_km",
+                None
+            ),
+            environment_samples=getattr(
+                trip,
+                "environment_samples",
+                []
+            ) or [],
+            learning_confidence_score=learning_confidence_score
+        )
+
+        return TripService.soc_uncertainty_to_response(
+            uncertainty
+        )
+
+    @staticmethod
+    def build_journey_soc_uncertainty_response(
+        journey,
+        estimated_arrival_soc_percent
+    ):
+        if journey is None:
+            return None
+
+        trips = getattr(
+            journey,
+            "trips",
+            []
+        ) or []
+
+        if not trips:
+            return None
+
+        first_trip = trips[0]
+
+        vehicle = getattr(
+            first_trip,
+            "vehicle",
+            None
+        )
+
+        if vehicle is None:
+            return None
+
+        energy_used_kwh = 0.0
+        distance_km = 0.0
+        environment_samples = []
+
+        for trip in trips:
+            simulation = getattr(
+                trip,
+                "simulation",
+                None
+            )
+
+            route = getattr(
+                trip,
+                "route",
+                None
+            )
+
+            if simulation:
+                energy_used_kwh += getattr(
+                    simulation,
+                    "energy_needed_kwh",
+                    0.0
+                ) or 0.0
+
+            if route:
+                distance_km += getattr(
+                    route,
+                    "distance_km",
+                    0.0
+                ) or 0.0
+
+            environment_samples.extend(
+                getattr(
+                    trip,
+                    "environment_samples",
+                    []
+                ) or []
+            )
+
+        learning = TripService.build_journey_learning_response(
+            journey
+        )
+
+        learning_confidence_score = 0.0
+
+        if learning:
+            learning_confidence_score = learning.get(
+                "confidence_score",
+                0.0
+            ) or 0.0
+
+        uncertainty = UncertaintyService.build(
+            estimated_arrival_soc_percent=estimated_arrival_soc_percent,
+            usable_battery_kwh=getattr(
+                vehicle,
+                "usable_battery_kwh",
+                None
+            ),
+            energy_used_kwh=energy_used_kwh,
+            distance_km=distance_km,
+            environment_samples=environment_samples,
+            learning_confidence_score=learning_confidence_score
+        )
+
+        return TripService.soc_uncertainty_to_response(
+            uncertainty
+        )
+
+    @staticmethod
+    def soc_uncertainty_to_response(uncertainty):
+        if uncertainty is None:
+            return None
+
+        return {
+            "arrival_soc_most_likely_percent": getattr(
+                uncertainty,
+                "arrival_soc_most_likely_percent",
+                None
+            ),
+            "arrival_soc_low_percent": getattr(
+                uncertainty,
+                "arrival_soc_low_percent",
+                None
+            ),
+            "arrival_soc_high_percent": getattr(
+                uncertainty,
+                "arrival_soc_high_percent",
+                None
+            ),
+            "confidence_score": getattr(
+                uncertainty,
+                "confidence_score",
+                None
+            ),
+            "energy_uncertainty_kwh": getattr(
+                uncertainty,
+                "energy_uncertainty_kwh",
+                None
+            ),
+            "soc_uncertainty_percent": getattr(
+                uncertainty,
+                "soc_uncertainty_percent",
+                None
+            ),
+            "uncertainty_percent": getattr(
+                uncertainty,
+                "uncertainty_percent",
+                None
+            ),
+            "factors": getattr(
+                uncertainty,
+                "factors",
+                []
+            ) or [],
+            "warnings": getattr(
+                uncertainty,
+                "warnings",
+                []
+            ) or []
+        }
+
+    @staticmethod
+    def build_prediction_impact_response(trip):
+        if trip is None:
+            return None
+
+        route = getattr(
+            trip,
+            "route",
+            None
+        )
+
+        simulation = getattr(
+            trip,
+            "simulation",
+            None
+        )
+
+        if route is None or simulation is None:
+            return None
+
+        vehicle = getattr(
+            trip,
+            "vehicle",
+            None
+        )
+
+        usable_battery_kwh = getattr(
+            vehicle,
+            "usable_battery_kwh",
+            None
+        )
+
+        impact = PredictionImpactService.build(
+            route=route,
+            environment_samples=getattr(
+                trip,
+                "environment_samples",
+                []
+            ) or [],
+            vehicle_base_efficiency=getattr(
+                trip,
+                "base_predicted_efficiency",
+                None
+            ),
+            learned_efficiency=getattr(
+                trip,
+                "learned_predicted_efficiency",
+                getattr(
+                    simulation,
+                    "predicted_efficiency",
+                    None
+                )
+            ),
+            final_energy_kwh=getattr(
+                simulation,
+                "energy_needed_kwh",
+                None
+            ),
+            usable_battery_kwh=usable_battery_kwh
+        )
+
+        return TripService.prediction_impact_to_response(
+            impact
+        )
+
+    @staticmethod
+    def build_journey_prediction_impact_response(journey):
+        if journey is None:
+            return None
+
+        impacts = []
+
+        for trip in getattr(
+            journey,
+            "trips",
+            []
+        ) or []:
+            impact = TripService.build_prediction_impact_response(
+                trip
+            )
+
+            if impact:
+                impacts.append(
+                    impact
+                )
+
+        if not impacts:
+            return None
+
+        return TripService.combine_prediction_impacts(
+            impacts
+        )
+
+    @staticmethod
+    def prediction_impact_to_response(impact):
+        if impact is None:
+            return None
+
+        fields = TripService.prediction_impact_numeric_fields()
+
+        response = {}
+
+        for field in fields:
+            response[field] = getattr(
+                impact,
+                field,
+                None
+            )
+
+        response["warnings"] = getattr(
+            impact,
+            "warnings",
+            []
+        ) or []
+
+        return response
+
+    @staticmethod
+    def combine_prediction_impacts(impacts):
+        response = {}
+
+        for field in TripService.prediction_impact_numeric_fields():
+            response[field] = TripService.sum_prediction_impact_field(
+                impacts=impacts,
+                field=field
+            )
+
+        warnings = []
+
+        for impact in impacts:
+            for warning in impact.get(
+                "warnings",
+                []
+            ):
+                if warning not in warnings:
+                    warnings.append(
+                        warning
+                    )
+
+        response["warnings"] = warnings
+
+        return response
+
+    @staticmethod
+    def sum_prediction_impact_field(
+        impacts,
+        field
+    ):
+        values = []
+
+        for impact in impacts:
+            value = impact.get(
+                field
+            )
+
+            if value is None:
+                continue
+
+            values.append(
+                value
+            )
+
+        if not values:
+            return None
+
+        return TripService.round_value(
+            sum(
+                values
+            ),
+            2
+        )
+
+    @staticmethod
+    def prediction_impact_numeric_fields():
+        return [
+            "vehicle_base_energy_kwh",
+            "learned_base_energy_kwh",
+            "final_energy_kwh",
+            "learning_impact_kwh",
+            "temperature_impact_kwh",
+            "wind_impact_kwh",
+            "elevation_impact_kwh",
+            "conditions_impact_kwh",
+            "total_impact_kwh",
+            "learning_soc_impact_percent",
+            "temperature_soc_impact_percent",
+            "wind_soc_impact_percent",
+            "elevation_soc_impact_percent",
+            "conditions_soc_impact_percent",
+            "total_soc_impact_percent",
+            "elevation_gain_m",
+            "elevation_loss_m",
+            "net_elevation_change_m"
+        ]
 
     @staticmethod
     def build_weather_response(trip):

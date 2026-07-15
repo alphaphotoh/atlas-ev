@@ -474,3 +474,158 @@ select:focus {
   margin-bottom: 18px;
   font-weight: 600;
 }
+
+.impact-panel {
+  margin-top: 22px;
+  border: 1px solid #e5eaf2;
+  border-radius: 18px;
+  padding: 18px;
+  background: #fbfdff;
+}
+
+.impact-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.impact-header h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 1.05rem;
+}
+
+.impact-header p {
+  margin: 4px 0 0;
+  color: #687386;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.impact-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.impact-grid > div {
+  border: 1px solid #e5eaf2;
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 12px;
+  min-height: 78px;
+}
+
+.impact-grid span {
+  display: block;
+  color: #687386;
+  font-size: 0.78rem;
+  margin-bottom: 8px;
+}
+
+.impact-grid strong {
+  display: block;
+  color: #0f1f35;
+  font-size: 1rem;
+}
+
+.impact-grid small {
+  display: block;
+  margin-top: 6px;
+  color: #687386;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .impact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .impact-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.uncertainty-panel {
+  margin-top: 22px;
+  border: 1px solid #d8e7fb;
+  border-radius: 18px;
+  padding: 18px;
+  background: #f8fbff;
+}
+
+.uncertainty-hero {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.uncertainty-hero > div {
+  border: 1px solid #d8e7fb;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.uncertainty-hero span {
+  display: block;
+  color: #687386;
+  font-size: 0.8rem;
+  margin-bottom: 8px;
+}
+
+.uncertainty-hero strong {
+  display: block;
+  color: #0f1f35;
+  font-size: 1.15rem;
+}
+
+.compact-impact-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
+.factor-list {
+  border: 1px solid #e5eaf2;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 14px;
+  margin-top: 12px;
+}
+
+.factor-list > span {
+  display: block;
+  color: #687386;
+  font-size: 0.8rem;
+  margin-bottom: 10px;
+}
+
+.factor-list > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.factor-list strong {
+  display: inline-flex;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #172033;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 900px) {
+  .uncertainty-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .compact-impact-grid {
+    grid-template-columns: 1fr;
+  }
+}

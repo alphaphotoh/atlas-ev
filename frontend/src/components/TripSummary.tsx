@@ -1,5 +1,6 @@
 import type {
   PredictionImpact,
+  SocUncertainty,
   TripSummary as TripSummaryType,
   WaypointMode
 } from "../types/trip";
@@ -38,6 +39,14 @@ function formatSignedKwh(value?: number | null) {
   return `${prefix}${value.toFixed(1)} kWh`;
 }
 
+function formatPercent(value?: number | null) {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+
+  return `${value.toFixed(1)}%`;
+}
+
 function formatSignedPercent(value?: number | null) {
   if (value === null || value === undefined) {
     return "—";
@@ -46,6 +55,14 @@ function formatSignedPercent(value?: number | null) {
   const prefix = value > 0 ? "+" : "";
 
   return `${prefix}${value.toFixed(1)}%`;
+}
+
+function formatConfidence(value?: number | null) {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+
+  return `${(value * 100).toFixed(0)}%`;
 }
 
 function formatMeters(value?: number | null) {
@@ -94,6 +111,101 @@ function hasPredictionImpact(impact?: PredictionImpact | null) {
   );
 }
 
+function hasSocUncertainty(uncertainty?: SocUncertainty | null) {
+  if (!uncertainty) {
+    return false;
+  }
+
+  return (
+    uncertainty.arrival_soc_low_percent !== undefined ||
+    uncertainty.arrival_soc_high_percent !== undefined ||
+    uncertainty.confidence_score !== undefined
+  );
+}
+
+function SocUncertaintyPanel({
+  uncertainty
+}: {
+  uncertainty?: SocUncertainty | null;
+}) {
+  if (!hasSocUncertainty(uncertainty)) {
+    return null;
+  }
+
+  return (
+    <div className="uncertainty-panel">
+      <div className="impact-header">
+        <div>
+          <h3>Final SOC Confidence Range</h3>
+          <p>
+            Shows a realistic arrival SOC range instead of one exact number.
+          </p>
+        </div>
+      </div>
+
+      <div className="uncertainty-hero">
+        <div>
+          <span>Expected Final SOC Range</span>
+          <strong>
+            {formatPercent(uncertainty?.arrival_soc_low_percent)}
+            {" – "}
+            {formatPercent(uncertainty?.arrival_soc_high_percent)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Most Likely Final SOC</span>
+          <strong>
+            {formatPercent(uncertainty?.arrival_soc_most_likely_percent)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Confidence</span>
+          <strong>{formatConfidence(uncertainty?.confidence_score)}</strong>
+        </div>
+      </div>
+
+      <div className="impact-grid compact-impact-grid">
+        <div>
+          <span>Energy Uncertainty</span>
+          <strong>{formatKwh(uncertainty?.energy_uncertainty_kwh)}</strong>
+        </div>
+
+        <div>
+          <span>SOC Uncertainty</span>
+          <strong>±{formatPercent(uncertainty?.soc_uncertainty_percent)}</strong>
+        </div>
+
+        <div>
+          <span>Model Uncertainty</span>
+          <strong>{formatPercent(uncertainty?.uncertainty_percent)}</strong>
+        </div>
+      </div>
+
+      {uncertainty?.factors && uncertainty.factors.length > 0 && (
+        <div className="factor-list">
+          <span>Uncertainty Factors</span>
+
+          <div>
+            {uncertainty.factors.map((factor) => (
+              <strong key={factor}>{factor}</strong>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {uncertainty?.warnings && uncertainty.warnings.length > 0 && (
+        <div className="warnings">
+          {uncertainty.warnings.map((warning) => (
+            <p key={warning}>{warning}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PredictionImpactBreakdown({
   impact
 }: {
@@ -109,8 +221,8 @@ function PredictionImpactBreakdown({
         <div>
           <h3>Prediction Impact Breakdown</h3>
           <p>
-            Shows how the original estimate changed after learning, weather, wind,
-            and elevation adjustments.
+            Shows how the original estimate changed after learning, weather,
+            wind, and elevation adjustments.
           </p>
         </div>
       </div>
@@ -183,7 +295,7 @@ function PredictionImpactBreakdown({
         </div>
 
         <div>
-          <span>Weather/Wind/Elevation change</span>
+          <span>Weather/Wind/Elevation Change</span>
           <strong>{formatSignedKwh(impact?.conditions_impact_kwh)}</strong>
           <small>
             {formatSignedPercent(impact?.conditions_soc_impact_percent)} SOC
@@ -284,6 +396,10 @@ export function TripSummary({
           ))}
         </div>
       )}
+
+      <SocUncertaintyPanel
+        uncertainty={summary.soc_uncertainty}
+      />
 
       <PredictionImpactBreakdown
         impact={summary.prediction_impact}

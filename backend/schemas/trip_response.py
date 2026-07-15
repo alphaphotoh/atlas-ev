@@ -158,6 +158,47 @@ class MapResponse(BaseModel):
     bounds: MapBoundsResponse | None = None
 
 
+class PredictionImpactResponse(BaseModel):
+    vehicle_base_energy_kwh: float | None = None
+    learned_base_energy_kwh: float | None = None
+    final_energy_kwh: float | None = None
+
+    learning_impact_kwh: float | None = None
+    temperature_impact_kwh: float | None = None
+    wind_impact_kwh: float | None = None
+    elevation_impact_kwh: float | None = None
+    conditions_impact_kwh: float | None = None
+    total_impact_kwh: float | None = None
+
+    learning_soc_impact_percent: float | None = None
+    temperature_soc_impact_percent: float | None = None
+    wind_soc_impact_percent: float | None = None
+    elevation_soc_impact_percent: float | None = None
+    conditions_soc_impact_percent: float | None = None
+    total_soc_impact_percent: float | None = None
+
+    elevation_gain_m: float | None = None
+    elevation_loss_m: float | None = None
+    net_elevation_change_m: float | None = None
+
+    warnings: list[str] = Field(default_factory=list)
+
+
+class SocUncertaintyResponse(BaseModel):
+    arrival_soc_most_likely_percent: float | None = None
+    arrival_soc_low_percent: float | None = None
+    arrival_soc_high_percent: float | None = None
+
+    confidence_score: float | None = None
+
+    energy_uncertainty_kwh: float | None = None
+    soc_uncertainty_percent: float | None = None
+    uncertainty_percent: float | None = None
+
+    factors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class TripSummaryResponse(BaseModel):
     distance_km: float
 
@@ -175,6 +216,8 @@ class TripSummaryResponse(BaseModel):
     predicted_efficiency: float | None = None
     estimated_arrival_soc_without_charging: float | None = None
     actual_arrival_soc_without_charging: float | None = None
+    prediction_impact: PredictionImpactResponse | None = None
+    soc_uncertainty: SocUncertaintyResponse | None = None
 
 
 class TripResponse(BaseModel):
