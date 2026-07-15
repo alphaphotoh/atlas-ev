@@ -113,7 +113,8 @@ function App() {
             waypointMode={trip.waypoint_mode}
           />
           <RouteLegs legs={trip.route_legs} />
-          <ChargingStops stops={chargingStops} />
+          <ChargingStops stops={chargingStops}
+              summary={trip.summary} />
           <TripMap mapData={trip.map} />
         </>
       )}

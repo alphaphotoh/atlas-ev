@@ -629,3 +629,52 @@ select:focus {
     grid-template-columns: 1fr;
   }
 }
+
+.charging-explanation {
+  margin-top: 16px;
+  border: 1px solid #e5eaf2;
+  border-radius: 16px;
+  background: #fbfdff;
+  padding: 14px;
+}
+
+.charging-explanation h4 {
+  margin: 0 0 12px;
+  color: #172033;
+  font-size: 1rem;
+}
+
+.explanation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.explanation-grid > div {
+  border: 1px solid #e5eaf2;
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.explanation-grid span {
+  display: block;
+  color: #28527a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.explanation-grid p {
+  margin: 0;
+  color: #4d596b;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  font-weight: 600;
+}
+
+@media (max-width: 700px) {
+  .explanation-grid {
+    grid-template-columns: 1fr;
+  }
+}
