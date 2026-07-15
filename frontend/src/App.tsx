@@ -3,6 +3,7 @@ import axios from "axios";
 
 import { planTrip } from "./api/atlasApi";
 import { ChargingStops } from "./components/ChargingStops";
+import { GoogleMapsShare } from "./components/GoogleMapsShare";
 import { RouteLegs } from "./components/RouteLegs";
 import { TripForm } from "./components/TripForm";
 import { TripMap } from "./components/TripMap";
@@ -112,10 +113,20 @@ function App() {
             summary={trip.summary}
             waypointMode={trip.waypoint_mode}
           />
+
+          <GoogleMapsShare
+            trip={trip}
+            chargingStops={chargingStops}
+          />
+
           <RouteLegs legs={trip.route_legs} />
-          <ChargingStops stops={chargingStops}
-              summary={trip.summary}
-              alternativePlansByLeg={trip.alternative_plans_by_leg} />
+
+          <ChargingStops
+            stops={chargingStops}
+            summary={trip.summary}
+            alternativePlansByLeg={trip.alternative_plans_by_leg}
+          />
+
           <TripMap mapData={trip.map} />
         </>
       )}

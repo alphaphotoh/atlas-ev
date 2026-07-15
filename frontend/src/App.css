@@ -803,3 +803,102 @@ select:focus {
     grid-template-columns: 1fr;
   }
 }
+
+.google-share-card {
+  border: 1px solid #d8e7fb;
+  background: #fbfdff;
+}
+
+.share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.share-button,
+.secondary-share-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 11px 16px;
+  font-weight: 900;
+  text-decoration: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.share-button {
+  background: #28527a;
+  color: #ffffff;
+}
+
+.secondary-share-button {
+  background: #eef2f7;
+  color: #172033;
+  border: 1px solid #d5dce8;
+}
+
+.share-route-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.share-route-list > div {
+  border: 1px solid #e5eaf2;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.share-route-list span {
+  display: block;
+  color: #687386;
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.share-route-list strong {
+  display: block;
+  color: #172033;
+  font-size: 0.95rem;
+}
+
+.share-route-list small {
+  display: block;
+  color: #687386;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.share-warning {
+  margin-top: 14px;
+  border: 1px solid #f0c36d;
+  border-radius: 14px;
+  background: #fff8e8;
+  color: #7a5200;
+  padding: 12px 14px;
+  font-weight: 800;
+}
+
+@media (max-width: 900px) {
+  .share-route-list {
+    grid-template-columns: 1fr;
+  }
+
+  .share-actions {
+    justify-content: flex-start;
+  }
+}
+
+.share-note {
+  margin-top: 12px;
+  border: 1px solid #d8e7fb;
+  border-radius: 14px;
+  background: #f8fbff;
+  color: #4d596b;
+  padding: 12px 14px;
+  font-weight: 700;
+}
