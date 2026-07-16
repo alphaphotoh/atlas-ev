@@ -1780,3 +1780,137 @@ select:focus {
 .tesla-availability-line.unknown .tesla-availability-dot {
   background: #8e8e93;
 }
+
+.availability-risk-card {
+  border: 1px solid #e4e6ea;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.availability-risk-card.full {
+  max-width: 1050px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.availability-risk-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.availability-risk-header span,
+.availability-risk-selected span,
+.availability-risk-action span,
+.availability-backup span {
+  display: block;
+  color: #5c5e62;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.availability-risk-header h3 {
+  margin: 3px 0 0;
+  color: #171a20;
+  font-size: 1rem;
+}
+
+.availability-risk-header strong {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.availability-risk-card > p {
+  margin: 0;
+  color: #393c41;
+  font-weight: 750;
+  font-size: 0.88rem;
+}
+
+.availability-risk-selected,
+.availability-risk-action,
+.availability-backup {
+  border-radius: 13px;
+  background: #f4f4f4;
+  padding: 11px;
+}
+
+.availability-risk-selected strong,
+.availability-risk-action strong,
+.availability-backup strong {
+  display: block;
+  margin-top: 4px;
+  color: #171a20;
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+.availability-risk-selected small,
+.availability-backup small {
+  display: block;
+  margin-top: 4px;
+  color: #5c5e62;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.availability-risk-low .availability-risk-header strong {
+  background: #f1fbf5;
+  color: #188455;
+}
+
+.availability-risk-medium {
+  border-color: #ffe2a8;
+  background: #fffdf7;
+}
+
+.availability-risk-medium .availability-risk-header strong {
+  background: #fff3d1;
+  color: #a45e00;
+}
+
+.availability-risk-high {
+  border-color: #ffd0d5;
+  background: #fff8f8;
+}
+
+.availability-risk-high .availability-risk-header strong {
+  background: #ffe6e9;
+  color: #b3263c;
+}
+
+.availability-backup-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.availability-backup-metrics div {
+  border: 1px solid #e7e9ee;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.availability-backup-metrics span {
+  font-size: 0.68rem;
+}
+
+.availability-backup-metrics strong {
+  font-size: 0.88rem;
+}
+
+@media (max-width: 900px) {
+  .availability-backup-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

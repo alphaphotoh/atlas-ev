@@ -3,6 +3,7 @@ import axios from "axios";
 
 import { planTrip } from "./api/atlasApi";
 import { AlternativePlans } from "./components/AlternativePlans";
+import { AvailabilityRiskPanel } from "./components/AvailabilityRiskPanel";
 import { ChargingStops } from "./components/ChargingStops";
 import { GoogleMapsShare } from "./components/GoogleMapsShare";
 import { RouteLegs } from "./components/RouteLegs";
@@ -110,6 +111,22 @@ function availabilityClass(status: string | null) {
   return "unknown";
 }
 
+function getFinalSoc(summary: unknown): number | null {
+  return firstNumber(summary, [
+    "final_arrival_soc",
+    "final_soc",
+    "final_soc_percent",
+    "arrival_soc",
+    "arrival_soc_percent",
+    "estimated_arrival_soc",
+    "estimated_arrival_soc_percent",
+    "destination_arrival_soc",
+    "destination_arrival_soc_percent",
+    "ending_soc",
+    "ending_soc_percent"
+  ]);
+}
+
 function formatMinutes(value?: number | null) {
   if (value === null || value === undefined) {
     return "—";
@@ -194,14 +211,7 @@ function CompactTripHeader({
         <div>
           <span>Final SOC</span>
           <strong>
-            {formatPercent(
-              firstNumber(trip.summary, [
-                "estimated_arrival_soc_percent",
-                "estimated_arrival_soc",
-                "final_soc_percent",
-                "arrival_soc_percent"
-              ])
-            )}
+            {formatPercent(getFinalSoc(trip.summary))}
           </strong>
         </div>
       </div>
@@ -469,6 +479,12 @@ function App() {
 
               <CompactChargingTimeline trip={trip} chargingStops={chargingStops} />
 
+              <AvailabilityRiskPanel
+                chargingStops={chargingStops}
+                alternativePlansByLeg={trip.alternative_plans_by_leg}
+                variant="compact"
+              />
+
               <button
                 className="tesla-details-button"
                 type="button"
@@ -502,6 +518,12 @@ function App() {
               <TripSummary
                 summary={trip.summary}
                 waypointMode={trip.waypoint_mode}
+              />
+
+              <AvailabilityRiskPanel
+                chargingStops={chargingStops}
+                alternativePlansByLeg={trip.alternative_plans_by_leg}
+                variant="full"
               />
 
               <GoogleMapsShare trip={trip} chargingStops={chargingStops} />
