@@ -1,5 +1,6 @@
 import type {
   PredictionImpact,
+  TripConditionsImpact,
   SocUncertainty,
   TripSummary as TripSummaryType,
   WaypointMode
@@ -295,7 +296,7 @@ function PredictionImpactBreakdown({
         </div>
 
         <div>
-          <span>Weather/Wind/Elevation Change</span>
+          <span>Weather / Wind / Elevation / Trip Conditions Change</span>
           <strong>{formatSignedKwh(impact?.conditions_impact_kwh)}</strong>
           <small>
             {formatSignedPercent(impact?.conditions_soc_impact_percent)} SOC
@@ -313,6 +314,125 @@ function PredictionImpactBreakdown({
     </div>
   );
 }
+
+
+function TripConditionsImpactPanel({
+  impact
+}: {
+  impact?: TripConditionsImpact | null;
+}) {
+  if (!impact?.applied) {
+    return null;
+  }
+
+  const factors = impact.factors ?? [];
+  const warnings = impact.warnings ?? [];
+
+  return (
+    <section className="impact-panel trip-conditions-impact">
+      <div className="impact-header">
+        <div>
+          <h3>Trip Conditions Impact</h3>
+          <p>
+            Shows optional condition adjustments from the advanced trip
+            conditions section.
+          </p>
+        </div>
+      </div>
+
+      <div className="impact-grid">
+        <div>
+          <span>Total Condition Energy Impact</span>
+          <strong>{formatKwh(impact.energy_impact_kwh)}</strong>
+          <small>
+            {impact.soc_impact_percent !== null &&
+            impact.soc_impact_percent !== undefined
+              ? `${impact.soc_impact_percent.toFixed(1)}% SOC`
+              : "SOC impact not available"}
+          </small>
+        </div>
+
+        <div>
+          <span>Efficiency Adjustment</span>
+          <strong>
+            {impact.efficiency_adjustment_kwh_per_100km.toFixed(2)}{" "}
+            kWh/100km
+          </strong>
+        </div>
+
+        <div>
+          <span>Passenger/Cargo Impact</span>
+          <strong>{formatKwh(impact.passenger_cargo_impact_kwh)}</strong>
+        </div>
+
+        <div>
+          <span>Climate Impact</span>
+          <strong>{formatKwh(impact.climate_impact_kwh)}</strong>
+        </div>
+
+        <div>
+          <span>Driving Style Impact</span>
+          <strong>{formatKwh(impact.driving_style_impact_kwh)}</strong>
+        </div>
+
+        <div>
+          <span>Road Condition Impact</span>
+          <strong>{formatKwh(impact.road_condition_impact_kwh)}</strong>
+        </div>
+
+        <div>
+          <span>Tire Impact</span>
+          <strong>{formatKwh(impact.tire_impact_kwh)}</strong>
+        </div>
+
+        <div>
+          <span>Roof Load Impact</span>
+          <strong>{formatKwh(impact.roof_load_impact_kwh)}</strong>
+        </div>
+
+        <div>
+          <span>Battery Degradation</span>
+          <strong>
+            {impact.battery_degradation_percent !== null &&
+            impact.battery_degradation_percent !== undefined
+              ? `${impact.battery_degradation_percent.toFixed(1)}%`
+              : "Not applied"}
+          </strong>
+        </div>
+
+        <div>
+          <span>Usable Battery Reduction</span>
+          <strong>
+            {impact.usable_battery_reduction_kwh !== null &&
+            impact.usable_battery_reduction_kwh !== undefined
+              ? formatKwh(impact.usable_battery_reduction_kwh)
+              : "Not applied"}
+          </strong>
+        </div>
+      </div>
+
+      {factors.length > 0 && (
+        <div className="condition-factor-list">
+          <span>Applied Factors</span>
+          <div>
+            {factors.map((factor) => (
+              <strong key={factor}>{factor}</strong>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {warnings.length > 0 && (
+        <div className="warning-list">
+          {warnings.map((warning) => (
+            <p key={warning}>{warning}</p>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 
 export function TripSummary({
   summary,
