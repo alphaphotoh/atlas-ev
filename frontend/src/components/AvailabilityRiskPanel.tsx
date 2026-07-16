@@ -26,6 +26,13 @@ interface RiskResult {
   action: string;
 }
 
+interface SaferPlanRecommendation {
+  level: "proceed" | "prepare" | "switch" | "review";
+  title: string;
+  message: string;
+  badge: string;
+}
+
 function asRecord(value: unknown): RecordValue {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     return value as RecordValue;
@@ -399,6 +406,47 @@ function deltaClass(
   return good ? "delta-good" : "delta-caution";
 }
 
+function buildSaferPlanRecommendation(
+  risk: RiskResult,
+  backup: BackupOption | null,
+  selectedName: string
+): SaferPlanRecommendation {
+  if (!backup) {
+    return {
+      level: "review",
+      title: risk.title,
+      message:
+        "No safer backup option is available in the current plan. Review alternative charging options before departure.",
+      badge: "Review needed"
+    };
+  }
+
+  if (risk.level === "high") {
+    return {
+      level: "switch",
+      title: "Switch to safer backup",
+      message: `Use ${backup.chargerName} instead of ${selectedName} before relying on the selected charger.`,
+      badge: "Switch recommended"
+    };
+  }
+
+  if (risk.level === "medium") {
+    return {
+      level: "prepare",
+      title: "Safer backup ready",
+      message: `Keep ${selectedName} in the plan, but prepare ${backup.chargerName} as the fallback.`,
+      badge: "Keep ready"
+    };
+  }
+
+  return {
+    level: "proceed",
+    title: "Selected stop preferred",
+    message: `Proceed with ${selectedName}. Keep ${backup.chargerName} as a normal backup option.`,
+    badge: "Proceed"
+  };
+}
+
 export function AvailabilityRiskPanel({
   chargingStops,
   alternativePlansByLeg,
@@ -419,9 +467,16 @@ export function AvailabilityRiskPanel({
     "Selected charger";
 
   const source = firstString(stopRecord, ["availability_source"]);
+
+  const saferRecommendation = buildSaferPlanRecommendation(
+    risk,
+    backup,
+    primaryName
+  );
+
   const recommendation =
     firstString(stopRecord, ["availability_recommendation"]) ??
-    risk.action;
+    saferRecommendation.message;
 
   const backupChargingDelta =
     backup !== null &&
@@ -447,14 +502,12 @@ export function AvailabilityRiskPanel({
 
   return (
     <section
-      className={`availability-risk-card availability-risk-${risk.level} ${variant}`}
+      className={`availability-risk-card availability-risk-${risk.level} availability-recommendation-${saferRecommendation.level} ${variant}`}
     >
       <div className="availability-risk-header">
         <div>
           <span>Availability Risk</span>
-          <h3>
-            {isSaferBackup ? "Safer backup ready" : risk.title}
-          </h3>
+          <h3>{saferRecommendation.title}</h3>
         </div>
 
         <strong>{risk.level}</strong>
@@ -474,6 +527,14 @@ export function AvailabilityRiskPanel({
       </div>
 
       {backup && (
+        <div className={`safer-plan-behavior ${saferRecommendation.level}`}>
+          <span>Auto safer-plan behavior</span>
+          <strong>{saferRecommendation.badge}</strong>
+          <p>{saferRecommendation.message}</p>
+        </div>
+      )}
+
+      {backup && (
         <div className="availability-backup safer-backup">
           <div className="availability-backup-header">
             <div>
@@ -482,7 +543,7 @@ export function AvailabilityRiskPanel({
               <small>{backup.network}</small>
             </div>
 
-            {isSaferBackup && <em>Keep ready</em>}
+            {isSaferBackup && <em>{saferRecommendation.badge}</em>}
           </div>
 
           <div className="availability-selected-vs-backup">
