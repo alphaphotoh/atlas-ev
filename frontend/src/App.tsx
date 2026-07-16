@@ -229,7 +229,13 @@ function CompactChargingTimeline({
     "estimated_arrival_soc_percent",
     "estimated_arrival_soc",
     "final_soc_percent",
-    "arrival_soc_percent"
+    "arrival_soc_percent",
+    "arrival_soc",
+    "final_soc",
+                "final_arrival_soc",
+    "ending_soc",
+    "destination_soc",
+    "destination_arrival_soc_percent"
   ]);
 
   const totalTime = firstNumber(trip.summary, [
@@ -310,6 +316,10 @@ function CompactChargingTimeline({
 
           const occupancyPercent = firstNumber(stop, ["occupancy_percent"]);
 
+          const availabilitySource = firstString(stop, [
+            "availability_source"
+          ]);
+
           return (
             <div className="tesla-route-node charging-node" key={`${stop.name}-${index}`}>
               <div className="tesla-route-connector" />
@@ -345,9 +355,12 @@ function CompactChargingTimeline({
 
                   <small>
                     {isLiveAvailability ? "Live" : "Not live"}
+                    {availabilitySource ? ` · ${availabilitySource}` : ""}
                     {availableStalls !== null && totalStalls !== null
                       ? ` · ${availableStalls}/${totalStalls} stalls`
-                      : ""}
+                      : totalStalls !== null
+                        ? ` · ${totalStalls} stalls listed`
+                        : ""}
                     {occupancyPercent !== null
                       ? ` · ${occupancyPercent.toFixed(0)}% occupied`
                       : ""}

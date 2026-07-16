@@ -6,6 +6,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from backend.services.charging.open_charge_map_service import (
+    OpenChargeMapMatch,
+    OpenChargeMapService,
+)
+
 
 @dataclass
 class ChargerAvailability:
@@ -27,24 +32,93 @@ class ChargerAvailabilityService:
     """
     Live-ready charger availability service.
 
-    Default:
-      CHARGER_AVAILABILITY_MODE=unknown
+    unknown:
+      honest default, no external provider
 
-    Demo/testing:
-      CHARGER_AVAILABILITY_MODE=estimated
+    estimated:
+      demo/testing occupancy only
 
-    Later:
-      provider adapters can replace this with real network APIs.
+    openchargemap:
+      free Open Charge Map metadata lookup.
+      This improves station metadata/status matching, but it is not live occupancy.
     """
 
     @staticmethod
     def get_availability(charger: Any) -> ChargerAvailability:
         mode = os.getenv("CHARGER_AVAILABILITY_MODE", "unknown").strip().lower()
 
+        if mode in {"openchargemap", "ocm"}:
+            ocm_match = OpenChargeMapService.find_near_charger(charger)
+
+            if ocm_match:
+                return ChargerAvailabilityService._from_open_charge_map(
+                    ocm_match
+                )
+
+            return ChargerAvailability(
+                status="unknown",
+                is_live=False,
+                confidence="low",
+                source="Open Charge Map not matched or API key missing",
+                recommendation=(
+                    "Could not match this charger to Open Charge Map. "
+                    "Keep a backup charger in the plan."
+                ),
+            )
+
         if mode == "estimated":
             return ChargerAvailabilityService._estimated_availability(charger)
 
         return ChargerAvailability()
+
+    @staticmethod
+    def _from_open_charge_map(
+        match: OpenChargeMapMatch,
+    ) -> ChargerAvailability:
+        now = datetime.now(timezone.utc).isoformat()
+
+        source_parts = ["Open Charge Map metadata"]
+
+        if match.operator:
+            source_parts.append(match.operator)
+
+        if match.status_title:
+            source_parts.append(match.status_title)
+
+        source = " · ".join(source_parts)
+
+        if match.is_operational is False:
+            return ChargerAvailability(
+                status="offline",
+                is_live=False,
+                available_stalls=0,
+                occupied_stalls=None,
+                total_stalls=match.total_stalls,
+                occupancy_percent=None,
+                confidence="metadata",
+                source=source,
+                last_updated=now,
+                recommendation=(
+                    "Open Charge Map metadata indicates this station may not "
+                    "be operational. Prefer a backup charger."
+                ),
+            )
+
+        return ChargerAvailability(
+            status="unknown",
+            is_live=False,
+            available_stalls=None,
+            occupied_stalls=None,
+            total_stalls=match.total_stalls,
+            occupancy_percent=None,
+            confidence="metadata",
+            source=source,
+            last_updated=now,
+            recommendation=(
+                "Station metadata was matched from Open Charge Map, but live "
+                "stall occupancy is not available from this free feed."
+            ),
+        )
 
     @staticmethod
     def _estimated_availability(charger: Any) -> ChargerAvailability:
@@ -79,7 +153,8 @@ class ChargerAvailabilityService:
         if available_stalls <= 0:
             status = "busy"
             recommendation = (
-                "Estimated busy. Consider a backup charger before relying on this stop."
+                "Estimated busy. Consider a backup charger before relying "
+                "on this stop."
             )
         elif available_stalls == 1:
             status = "limited"
