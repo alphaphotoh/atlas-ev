@@ -47,3 +47,16 @@ def test_open_charge_map_normalizes_poi_record():
     assert result.total_stalls == 3
     assert result.max_power_kw == 150
     assert result.distance_km is not None
+
+def test_open_charge_map_api_key_aliases(monkeypatch):
+    monkeypatch.delenv("OPEN_CHARGE_MAP_API_KEY", raising=False)
+    monkeypatch.delenv("OPENCHARGEMAP_API_KEY", raising=False)
+
+    assert OpenChargeMapService.get_api_key() == ""
+
+    monkeypatch.setenv("OPENCHARGEMAP_API_KEY", "old-style-key")
+    assert OpenChargeMapService.get_api_key() == "old-style-key"
+
+    monkeypatch.setenv("OPEN_CHARGE_MAP_API_KEY", "new-style-key")
+    assert OpenChargeMapService.get_api_key() == "new-style-key"
+

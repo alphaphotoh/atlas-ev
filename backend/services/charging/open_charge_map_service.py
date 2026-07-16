@@ -30,12 +30,19 @@ class OpenChargeMapService:
     _cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 
     @staticmethod
+    def get_api_key() -> str:
+        return (
+            os.getenv("OPEN_CHARGE_MAP_API_KEY", "").strip()
+            or os.getenv("OPENCHARGEMAP_API_KEY", "").strip()
+        )
+
+    @staticmethod
     def find_near_charger(
         charger: Any,
         radius_km: float = 2.0,
         max_results: int = 8,
     ) -> OpenChargeMapMatch | None:
-        api_key = os.getenv("OPEN_CHARGE_MAP_API_KEY", "").strip()
+        api_key = OpenChargeMapService.get_api_key()
 
         if not api_key:
             return None
