@@ -902,3 +902,43 @@ select:focus {
   padding: 12px 14px;
   font-weight: 700;
 }
+
+.trip-conditions-impact {
+  border-color: #d8eadf;
+  background: #fbfffc;
+}
+
+.condition-factor-list {
+  margin-top: 14px;
+  border: 1px solid #e5eaf2;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.condition-factor-list span {
+  display: block;
+  color: #687386;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.condition-factor-list div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.condition-factor-list strong {
+  border-radius: 999px;
+  background: #eef7f0;
+  color: #174a2a;
+  padding: 7px 10px;
+  font-size: 0.8rem;
+}
+
+.traffic-impact {
+  border-color: #d8e7fb;
+  background: #fbfdff;
+}

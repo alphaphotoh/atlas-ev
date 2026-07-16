@@ -13,7 +13,10 @@ class JourneyBuilder:
         waypoints,
         starting_soc,
         average_speed,
-        highway_ratio
+        highway_ratio,
+        traffic_mode="none",
+        traffic_level=None,
+        trip_conditions=None
     ):
         journey = Journey()
         current_soc = starting_soc
@@ -29,7 +32,10 @@ class JourneyBuilder:
                 destination=waypoint.destination,
                 starting_soc=current_soc,
                 average_speed=average_speed,
-                highway_ratio=highway_ratio
+                highway_ratio=highway_ratio,
+            traffic_mode=traffic_mode,
+            traffic_level=traffic_level,
+            trip_conditions=trip_conditions
             )
 
             if not is_final_leg:

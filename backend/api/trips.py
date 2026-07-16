@@ -50,6 +50,27 @@ async def plan_trip(request: TripRequest):
     if "waypoint_mode" in signature.parameters:
         kwargs["waypoint_mode"] = request.waypoint_mode
 
+    if "trip_conditions" in signature.parameters:
+        kwargs["trip_conditions"] = getattr(
+            request,
+            "trip_conditions",
+            None
+        )
+
+    if "traffic_mode" in signature.parameters:
+        kwargs["traffic_mode"] = getattr(
+            request,
+            "traffic_mode",
+            "none"
+        )
+
+    if "traffic_level" in signature.parameters:
+        kwargs["traffic_level"] = getattr(
+            request,
+            "traffic_level",
+            None
+        )
+
     return await TripService.build_trip(
         **kwargs
     )

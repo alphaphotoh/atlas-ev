@@ -1,5 +1,24 @@
 export type WaypointMode = "required_stops" | "via_points";
 
+export interface TripConditions {
+  passengers?: number;
+  cargo_weight_kg?: number;
+
+  climate_control?: string;
+  cabin_target_temp_c?: number;
+
+  driving_style?: string;
+  road_condition?: string;
+  tire_condition?: string;
+  roof_load?: string;
+
+  battery_degradation_percent?: number;
+}
+
+export type TrafficMode = "none" | "estimated" | "live";
+
+export type TrafficLevel = "light" | "moderate" | "heavy";
+
 export interface TripRequest {
   vehicle: string;
   origin: string;
@@ -9,6 +28,9 @@ export interface TripRequest {
   starting_soc: number;
   average_speed: number;
   highway_ratio: number;
+  traffic_mode?: TrafficMode;
+  traffic_level?: TrafficLevel | null;
+  trip_conditions?: TripConditions | null;
 }
 
 export interface PredictionImpact {
@@ -93,6 +115,45 @@ export interface TripMapData {
   bounds?: MapBounds;
 }
 
+export interface TrafficImpact {
+  applied: boolean;
+  mode: string;
+
+  duration_multiplier: number;
+  extra_duration_minutes: number;
+  adjusted_duration_minutes?: number | null;
+
+  efficiency_adjustment_kwh_per_100km: number;
+  energy_impact_kwh: number;
+  soc_impact_percent?: number | null;
+
+  traffic_level: string;
+  factors: string[];
+  warnings: string[];
+}
+
+export interface TripConditionsImpact {
+  applied: boolean;
+
+  efficiency_adjustment_kwh_per_100km: number;
+  energy_impact_kwh: number;
+  soc_impact_percent?: number | null;
+
+  passenger_cargo_impact_kwh: number;
+  climate_impact_kwh: number;
+  driving_style_impact_kwh: number;
+  road_condition_impact_kwh: number;
+  tire_impact_kwh: number;
+  roof_load_impact_kwh: number;
+
+  battery_degradation_percent?: number | null;
+  effective_usable_battery_kwh?: number | null;
+  usable_battery_reduction_kwh?: number | null;
+
+  factors: string[];
+  warnings: string[];
+}
+
 export interface TripSummary {
   distance_km: number;
   driving_minutes: number;
@@ -111,6 +172,8 @@ export interface TripSummary {
 
   prediction_impact?: PredictionImpact | null;
   soc_uncertainty?: SocUncertainty | null;
+  trip_conditions_impact?: TripConditionsImpact | null;
+  traffic_impact?: TrafficImpact | null;
 }
 
 export interface ChargingStop {

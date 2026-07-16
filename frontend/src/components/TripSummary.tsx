@@ -1,5 +1,6 @@
 import type {
   PredictionImpact,
+  TrafficImpact,
   TripConditionsImpact,
   SocUncertainty,
   TripSummary as TripSummaryType,
@@ -316,6 +317,100 @@ function PredictionImpactBreakdown({
 }
 
 
+
+function TrafficImpactPanel({
+  impact
+}: {
+  impact?: TrafficImpact | null;
+}) {
+  if (!impact?.applied) {
+    return null;
+  }
+
+  const factors = impact.factors ?? [];
+  const warnings = impact.warnings ?? [];
+
+  return (
+    <section className="impact-panel traffic-impact">
+      <div className="impact-header">
+        <div>
+          <h3>Traffic Impact</h3>
+          <p>
+            Shows estimated traffic delay and the extra energy needed because
+            of stop-and-go or slower driving conditions.
+          </p>
+        </div>
+      </div>
+
+      <div className="impact-grid">
+        <div>
+          <span>Traffic Mode</span>
+          <strong>{impact.mode}</strong>
+          <small>{impact.traffic_level}</small>
+        </div>
+
+        <div>
+          <span>Extra Driving Time</span>
+          <strong>{impact.extra_duration_minutes.toFixed(1)} min</strong>
+        </div>
+
+        <div>
+          <span>Adjusted Driving Time</span>
+          <strong>
+            {impact.adjusted_duration_minutes !== null &&
+            impact.adjusted_duration_minutes !== undefined
+              ? `${impact.adjusted_duration_minutes.toFixed(1)} min`
+              : "Not available"}
+          </strong>
+        </div>
+
+        <div>
+          <span>Energy Impact</span>
+          <strong>{formatKwh(impact.energy_impact_kwh)}</strong>
+          <small>
+            {impact.soc_impact_percent !== null &&
+            impact.soc_impact_percent !== undefined
+              ? `${impact.soc_impact_percent.toFixed(1)}% SOC`
+              : "SOC impact not available"}
+          </small>
+        </div>
+
+        <div>
+          <span>Efficiency Adjustment</span>
+          <strong>
+            {impact.efficiency_adjustment_kwh_per_100km.toFixed(2)} kWh/100km
+          </strong>
+        </div>
+
+        <div>
+          <span>Duration Multiplier</span>
+          <strong>{impact.duration_multiplier.toFixed(2)}x</strong>
+        </div>
+      </div>
+
+      {factors.length > 0 && (
+        <div className="condition-factor-list">
+          <span>Traffic Factors</span>
+          <div>
+            {factors.map((factor) => (
+              <strong key={factor}>{factor}</strong>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {warnings.length > 0 && (
+        <div className="warning-list">
+          {warnings.map((warning) => (
+            <p key={warning}>{warning}</p>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+
 function TripConditionsImpactPanel({
   impact
 }: {
@@ -524,6 +619,8 @@ export function TripSummary({
       <PredictionImpactBreakdown
         impact={summary.prediction_impact}
       />
-    </section>
+    
+      <TrafficImpactPanel impact={summary.traffic_impact} />
+</section>
   );
 }

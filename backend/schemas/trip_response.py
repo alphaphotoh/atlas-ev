@@ -190,6 +190,47 @@ class PredictionImpactResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+
+
+class TrafficImpactResponse(BaseModel):
+    applied: bool = False
+    mode: str = "none"
+
+    duration_multiplier: float = 1
+    extra_duration_minutes: float = 0
+    adjusted_duration_minutes: float | None = None
+
+    efficiency_adjustment_kwh_per_100km: float = 0
+    energy_impact_kwh: float = 0
+    soc_impact_percent: float | None = None
+
+    traffic_level: str = "none"
+    factors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class TripConditionsImpactResponse(BaseModel):
+    applied: bool = False
+
+    efficiency_adjustment_kwh_per_100km: float = 0
+    energy_impact_kwh: float = 0
+    soc_impact_percent: float | None = None
+
+    passenger_cargo_impact_kwh: float = 0
+    climate_impact_kwh: float = 0
+    driving_style_impact_kwh: float = 0
+    road_condition_impact_kwh: float = 0
+    tire_impact_kwh: float = 0
+    roof_load_impact_kwh: float = 0
+
+    battery_degradation_percent: float | None = None
+    effective_usable_battery_kwh: float | None = None
+    usable_battery_reduction_kwh: float | None = None
+
+    factors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class SocUncertaintyResponse(BaseModel):
     arrival_soc_most_likely_percent: float | None = None
     arrival_soc_low_percent: float | None = None
@@ -224,6 +265,8 @@ class TripSummaryResponse(BaseModel):
     actual_arrival_soc_without_charging: float | None = None
     prediction_impact: PredictionImpactResponse | None = None
     soc_uncertainty: SocUncertaintyResponse | None = None
+    trip_conditions_impact: TripConditionsImpactResponse | None = None
+    traffic_impact: TrafficImpactResponse | None = None
 
 
 class TripResponse(BaseModel):

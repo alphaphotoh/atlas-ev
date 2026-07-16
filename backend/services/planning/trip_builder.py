@@ -16,6 +16,12 @@ from backend.services.simulation.battery_simulator import BatterySimulator
 from backend.services.simulation.efficiency_profile_service import (
     EfficiencyProfileService,
 )
+from backend.services.simulation.trip_conditions_service import (
+    TripConditionsService,
+)
+from backend.services.simulation.traffic_impact_service import (
+    TrafficImpactService,
+)
 
 
 class TripBuilder:
@@ -29,7 +35,10 @@ class TripBuilder:
         destination,
         starting_soc,
         average_speed,
-        highway_ratio
+        highway_ratio,
+        traffic_mode="none",
+        traffic_level=None,
+        trip_conditions=None
     ):
         origin_data = await GeocodingService.search(
             origin
@@ -58,7 +67,10 @@ class TripBuilder:
             origin_coords=origin_coords,
             starting_soc=starting_soc,
             average_speed=average_speed,
-            highway_ratio=highway_ratio
+            highway_ratio=highway_ratio,
+            traffic_mode=traffic_mode,
+            traffic_level=traffic_level,
+            trip_conditions=trip_conditions
         )
 
     @staticmethod
@@ -69,7 +81,10 @@ class TripBuilder:
         destination,
         starting_soc,
         average_speed,
-        highway_ratio
+        highway_ratio,
+        traffic_mode="none",
+        traffic_level=None,
+        trip_conditions=None
     ):
         origin_data = await GeocodingService.search(
             origin
@@ -110,7 +125,10 @@ class TripBuilder:
             origin_coords=origin_coords,
             starting_soc=starting_soc,
             average_speed=average_speed,
-            highway_ratio=highway_ratio
+            highway_ratio=highway_ratio,
+            traffic_mode=traffic_mode,
+            traffic_level=traffic_level,
+            trip_conditions=trip_conditions
         )
 
     @staticmethod
@@ -120,7 +138,10 @@ class TripBuilder:
         origin_coords,
         starting_soc,
         average_speed,
-        highway_ratio
+        highway_ratio,
+        traffic_mode="none",
+        traffic_level=None,
+        trip_conditions=None
     ):
         weather = await WeatherService.get_weather(
             latitude=origin_coords[1],
@@ -153,29 +174,62 @@ class TripBuilder:
             learning_correction_factor
         )
 
+        trip_conditions_impact = TripConditionsService.build(
+            conditions=trip_conditions,
+            distance_km=route.distance_km,
+            usable_battery_kwh=vehicle.usable_battery_kwh
+        )
+
+        conditions_adjusted_efficiency = (
+            learned_predicted_efficiency +
+            trip_conditions_impact.efficiency_adjustment_kwh_per_100km
+        )
+
+        simulation_usable_battery_kwh = (
+            trip_conditions_impact.effective_usable_battery_kwh
+            or vehicle.usable_battery_kwh
+        )
+
+        traffic_impact = TrafficImpactService.build(
+            traffic_mode=traffic_mode,
+            traffic_level=traffic_level,
+            distance_km=route.distance_km,
+            duration_minutes=route.duration_minutes,
+            highway_ratio=highway_ratio,
+            usable_battery_kwh=simulation_usable_battery_kwh
+        )
+
+        if traffic_impact.applied and traffic_impact.adjusted_duration_minutes:
+            route.duration_minutes = traffic_impact.adjusted_duration_minutes
+
+        traffic_adjusted_efficiency = (
+            conditions_adjusted_efficiency +
+            traffic_impact.efficiency_adjustment_kwh_per_100km
+        )
+
         trip.efficiency_profile = EfficiencyProfileService.build(
             route=route,
             environment_samples=trip.environment_samples,
-            base_efficiency=learned_predicted_efficiency
+            base_efficiency=traffic_adjusted_efficiency
         )
 
         trip.battery_states = BatterySimulator.simulate(
             route=route,
             starting_soc=starting_soc,
-            usable_battery_kwh=vehicle.usable_battery_kwh,
-            efficiency=learned_predicted_efficiency,
+            usable_battery_kwh=simulation_usable_battery_kwh,
+            efficiency=traffic_adjusted_efficiency,
             efficiency_profile=trip.efficiency_profile
         )
 
         trip.simulation = TripBuilder.build_simulation_context(
             route=route,
             battery_states=trip.battery_states,
-            fallback_efficiency=learned_predicted_efficiency,
+            fallback_efficiency=traffic_adjusted_efficiency,
             average_speed=average_speed,
             temperature=weather.temperature_c,
             highway_ratio=highway_ratio,
             starting_soc=starting_soc,
-            usable_battery_kwh=vehicle.usable_battery_kwh
+            usable_battery_kwh=simulation_usable_battery_kwh
         )
 
         trip.remaining_distance_km = route.distance_km
@@ -188,6 +242,14 @@ class TripBuilder:
         trip.learning_correction_factor = learning_correction_factor
         trip.base_predicted_efficiency = base_predicted_efficiency
         trip.learned_predicted_efficiency = learned_predicted_efficiency
+        trip.trip_conditions = trip_conditions
+        trip.trip_conditions_impact = trip_conditions_impact
+        trip.traffic_mode = traffic_mode
+        trip.traffic_level = traffic_level
+        trip.traffic_impact = traffic_impact
+        trip.traffic_adjusted_efficiency = traffic_adjusted_efficiency
+        trip.conditions_adjusted_efficiency = conditions_adjusted_efficiency
+        trip.effective_usable_battery_kwh = simulation_usable_battery_kwh
 
         return trip
 
@@ -211,6 +273,29 @@ class TripBuilder:
         next_trip.corridor_chargers = trip.corridor_chargers
         next_trip.environment_samples = trip.environment_samples
         next_trip.efficiency_profile = trip.efficiency_profile
+        next_trip.trip_conditions = getattr(
+            trip,
+            "trip_conditions",
+            None
+        )
+        next_trip.trip_conditions_impact = getattr(
+            trip,
+            "trip_conditions_impact",
+            None
+        )
+        next_trip.traffic_impact = getattr(
+            trip,
+            "traffic_impact",
+            None
+        )
+        next_trip.conditions_adjusted_efficiency = getattr(
+            trip,
+            "conditions_adjusted_efficiency",
+            trip.simulation.predicted_efficiency
+        )
+        next_trip.effective_usable_battery_kwh = TripBuilder.effective_usable_battery_kwh(
+            trip
+        )
 
         next_trip.learning_vehicle_id = getattr(
             trip,
@@ -239,7 +324,9 @@ class TripBuilder:
         next_trip.battery_states = BatterySimulator.simulate(
             route=route,
             starting_soc=departure_soc,
-            usable_battery_kwh=trip.vehicle.usable_battery_kwh,
+            usable_battery_kwh=TripBuilder.effective_usable_battery_kwh(
+                trip
+            ),
             efficiency=trip.simulation.predicted_efficiency,
             efficiency_profile=trip.efficiency_profile
         )
@@ -252,7 +339,9 @@ class TripBuilder:
             temperature=trip.simulation.temperature,
             highway_ratio=trip.simulation.highway_ratio,
             starting_soc=departure_soc,
-            usable_battery_kwh=trip.vehicle.usable_battery_kwh
+            usable_battery_kwh=TripBuilder.effective_usable_battery_kwh(
+                trip
+            )
         )
 
         next_trip.remaining_distance_km = route.distance_km
@@ -375,6 +464,30 @@ class TripBuilder:
         return round(
             efficiency,
             3
+        )
+
+
+    @staticmethod
+    def effective_usable_battery_kwh(trip):
+        value = getattr(
+            trip,
+            "effective_usable_battery_kwh",
+            None
+        )
+
+        if value:
+            return value
+
+        vehicle = getattr(
+            trip,
+            "vehicle",
+            None
+        )
+
+        return getattr(
+            vehicle,
+            "usable_battery_kwh",
+            0.0
         )
 
     @staticmethod

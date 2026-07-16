@@ -19,6 +19,448 @@ from backend.services.simulation.uncertainty_service import (
 
 
 class TripService:
+    @staticmethod
+    def build_traffic_impact_response(source):
+        impact = getattr(
+            source,
+            "traffic_impact",
+            None
+        )
+
+        if impact is not None:
+            return TripService.traffic_impact_to_response(
+                impact
+            )
+
+        impacts = []
+
+        for attr_name in [
+            "route_legs",
+            "legs",
+            "trips"
+        ]:
+            values = getattr(
+                source,
+                attr_name,
+                None
+            )
+
+            if not values:
+                continue
+
+            for value in values:
+                leg_impact = getattr(
+                    value,
+                    "traffic_impact",
+                    None
+                )
+
+                if leg_impact is None:
+                    leg_trip = getattr(
+                        value,
+                        "trip",
+                        None
+                    )
+
+                    leg_impact = getattr(
+                        leg_trip,
+                        "traffic_impact",
+                        None
+                    )
+
+                if leg_impact is not None and getattr(
+                    leg_impact,
+                    "applied",
+                    False
+                ):
+                    impacts.append(
+                        leg_impact
+                    )
+
+        if not impacts:
+            return None
+
+        return TripService.aggregate_traffic_impacts(
+            impacts
+        )
+
+    @staticmethod
+    def traffic_impact_to_response(impact):
+        if impact is None:
+            return None
+
+        if not getattr(
+            impact,
+            "applied",
+            False
+        ):
+            return None
+
+        return {
+            "applied": getattr(impact, "applied", False),
+            "mode": getattr(impact, "mode", "none"),
+            "duration_multiplier": getattr(
+                impact,
+                "duration_multiplier",
+                1
+            ),
+            "extra_duration_minutes": getattr(
+                impact,
+                "extra_duration_minutes",
+                0
+            ),
+            "adjusted_duration_minutes": getattr(
+                impact,
+                "adjusted_duration_minutes",
+                None
+            ),
+            "efficiency_adjustment_kwh_per_100km": getattr(
+                impact,
+                "efficiency_adjustment_kwh_per_100km",
+                0
+            ),
+            "energy_impact_kwh": getattr(
+                impact,
+                "energy_impact_kwh",
+                0
+            ),
+            "soc_impact_percent": getattr(
+                impact,
+                "soc_impact_percent",
+                None
+            ),
+            "traffic_level": getattr(
+                impact,
+                "traffic_level",
+                "none"
+            ),
+            "factors": getattr(
+                impact,
+                "factors",
+                []
+            ),
+            "warnings": getattr(
+                impact,
+                "warnings",
+                []
+            )
+        }
+
+    @staticmethod
+    def aggregate_traffic_impacts(impacts):
+        def total(field_name):
+            return round(
+                sum(
+                    getattr(
+                        impact,
+                        field_name,
+                        0
+                    ) or 0
+                    for impact in impacts
+                ),
+                2
+            )
+
+        factors = []
+        warnings = []
+        modes = []
+        levels = []
+
+        for impact in impacts:
+            mode = getattr(
+                impact,
+                "mode",
+                None
+            )
+
+            if mode and mode not in modes:
+                modes.append(
+                    mode
+                )
+
+            level = getattr(
+                impact,
+                "traffic_level",
+                None
+            )
+
+            if level and level not in levels:
+                levels.append(
+                    level
+                )
+
+            for factor in getattr(
+                impact,
+                "factors",
+                []
+            ):
+                if factor not in factors:
+                    factors.append(
+                        factor
+                    )
+
+            for warning in getattr(
+                impact,
+                "warnings",
+                []
+            ):
+                if warning not in warnings:
+                    warnings.append(
+                        warning
+                    )
+
+        return {
+            "applied": True,
+            "mode": ", ".join(modes) if modes else "estimated",
+            "duration_multiplier": 1,
+            "extra_duration_minutes": total(
+                "extra_duration_minutes"
+            ),
+            "adjusted_duration_minutes": total(
+                "adjusted_duration_minutes"
+            ),
+            "efficiency_adjustment_kwh_per_100km": total(
+                "efficiency_adjustment_kwh_per_100km"
+            ),
+            "energy_impact_kwh": total(
+                "energy_impact_kwh"
+            ),
+            "soc_impact_percent": total(
+                "soc_impact_percent"
+            ),
+            "traffic_level": ", ".join(levels) if levels else "moderate",
+            "factors": factors,
+            "warnings": warnings
+        }
+
+    @staticmethod
+    def build_trip_conditions_impact_response(source):
+        impact = getattr(
+            source,
+            "trip_conditions_impact",
+            None
+        )
+
+        if impact is not None:
+            return TripService.trip_conditions_impact_to_response(
+                impact
+            )
+
+        impacts = []
+
+        for attr_name in [
+            "route_legs",
+            "legs",
+            "trips"
+        ]:
+            values = getattr(
+                source,
+                attr_name,
+                None
+            )
+
+            if not values:
+                continue
+
+            for value in values:
+                leg_impact = getattr(
+                    value,
+                    "trip_conditions_impact",
+                    None
+                )
+
+                if leg_impact is None:
+                    leg_trip = getattr(
+                        value,
+                        "trip",
+                        None
+                    )
+
+                    leg_impact = getattr(
+                        leg_trip,
+                        "trip_conditions_impact",
+                        None
+                    )
+
+                if leg_impact is not None and getattr(
+                    leg_impact,
+                    "applied",
+                    False
+                ):
+                    impacts.append(
+                        leg_impact
+                    )
+
+        if not impacts:
+            return None
+
+        return TripService.aggregate_trip_conditions_impacts(
+            impacts
+        )
+
+    @staticmethod
+    def trip_conditions_impact_to_response(impact):
+        if impact is None:
+            return None
+
+        if not getattr(
+            impact,
+            "applied",
+            False
+        ):
+            return None
+
+        return {
+            "applied": getattr(impact, "applied", False),
+            "efficiency_adjustment_kwh_per_100km": getattr(
+                impact,
+                "efficiency_adjustment_kwh_per_100km",
+                0
+            ),
+            "energy_impact_kwh": getattr(
+                impact,
+                "energy_impact_kwh",
+                0
+            ),
+            "soc_impact_percent": getattr(
+                impact,
+                "soc_impact_percent",
+                None
+            ),
+            "passenger_cargo_impact_kwh": getattr(
+                impact,
+                "passenger_cargo_impact_kwh",
+                0
+            ),
+            "climate_impact_kwh": getattr(
+                impact,
+                "climate_impact_kwh",
+                0
+            ),
+            "driving_style_impact_kwh": getattr(
+                impact,
+                "driving_style_impact_kwh",
+                0
+            ),
+            "road_condition_impact_kwh": getattr(
+                impact,
+                "road_condition_impact_kwh",
+                0
+            ),
+            "tire_impact_kwh": getattr(
+                impact,
+                "tire_impact_kwh",
+                0
+            ),
+            "roof_load_impact_kwh": getattr(
+                impact,
+                "roof_load_impact_kwh",
+                0
+            ),
+            "battery_degradation_percent": getattr(
+                impact,
+                "battery_degradation_percent",
+                None
+            ),
+            "effective_usable_battery_kwh": getattr(
+                impact,
+                "effective_usable_battery_kwh",
+                None
+            ),
+            "usable_battery_reduction_kwh": getattr(
+                impact,
+                "usable_battery_reduction_kwh",
+                None
+            ),
+            "factors": getattr(
+                impact,
+                "factors",
+                []
+            ),
+            "warnings": getattr(
+                impact,
+                "warnings",
+                []
+            )
+        }
+
+    @staticmethod
+    def aggregate_trip_conditions_impacts(impacts):
+        def total(field_name):
+            return round(
+                sum(
+                    getattr(
+                        impact,
+                        field_name,
+                        0
+                    ) or 0
+                    for impact in impacts
+                ),
+                2
+            )
+
+        factors = []
+        warnings = []
+
+        for impact in impacts:
+            for factor in getattr(
+                impact,
+                "factors",
+                []
+            ):
+                if factor not in factors:
+                    factors.append(
+                        factor
+                    )
+
+            for warning in getattr(
+                impact,
+                "warnings",
+                []
+            ):
+                if warning not in warnings:
+                    warnings.append(
+                        warning
+                    )
+
+        return {
+            "applied": True,
+            "efficiency_adjustment_kwh_per_100km": total(
+                "efficiency_adjustment_kwh_per_100km"
+            ),
+            "energy_impact_kwh": total(
+                "energy_impact_kwh"
+            ),
+            "soc_impact_percent": total(
+                "soc_impact_percent"
+            ),
+            "passenger_cargo_impact_kwh": total(
+                "passenger_cargo_impact_kwh"
+            ),
+            "climate_impact_kwh": total(
+                "climate_impact_kwh"
+            ),
+            "driving_style_impact_kwh": total(
+                "driving_style_impact_kwh"
+            ),
+            "road_condition_impact_kwh": total(
+                "road_condition_impact_kwh"
+            ),
+            "tire_impact_kwh": total(
+                "tire_impact_kwh"
+            ),
+            "roof_load_impact_kwh": total(
+                "roof_load_impact_kwh"
+            ),
+            "battery_degradation_percent": None,
+            "effective_usable_battery_kwh": None,
+            "usable_battery_reduction_kwh": total(
+                "usable_battery_reduction_kwh"
+            ),
+            "factors": factors,
+            "warnings": warnings
+        }
+
     DETOUR_SPEED_KMH = 50
     MAX_ALTERNATIVE_PLANS = 5
     MIN_SAFE_ARRIVAL_SOC = 10.0
@@ -32,6 +474,9 @@ class TripService:
         starting_soc: float,
         average_speed: float,
         highway_ratio: float,
+        traffic_mode="none",
+        traffic_level=None,
+        trip_conditions=None,
         waypoint_mode: str = "required_stops"
     ):
         vehicle = VehicleRegistry.get(vehicle_id)
@@ -48,7 +493,10 @@ class TripService:
                 destination=destination,
                 starting_soc=starting_soc,
                 average_speed=average_speed,
-                highway_ratio=highway_ratio
+                highway_ratio=highway_ratio,
+            traffic_mode=traffic_mode,
+            traffic_level=traffic_level,
+            trip_conditions=trip_conditions
             )
 
             planning_result = await TripExpander.expand_with_result(
@@ -81,7 +529,10 @@ class TripService:
                 waypoints=trip_waypoints,
                 starting_soc=starting_soc,
                 average_speed=average_speed,
-                highway_ratio=highway_ratio
+                highway_ratio=highway_ratio,
+            traffic_mode=traffic_mode,
+            traffic_level=traffic_level,
+            trip_conditions=trip_conditions
             )
 
             return TripService.build_journey_response(
@@ -100,7 +551,8 @@ class TripService:
             destination=destination,
             starting_soc=starting_soc,
             average_speed=average_speed,
-            highway_ratio=highway_ratio
+            highway_ratio=highway_ratio,
+            trip_conditions=trip_conditions
         )
 
         planning_result = await TripExpander.expand_with_result(
@@ -328,6 +780,8 @@ class TripService:
                 "prediction_impact": TripService.build_journey_prediction_impact_response(
                     journey
                 ),
+                "traffic_impact": TripService.build_traffic_impact_response(journey),
+            "trip_conditions_impact": TripService.build_trip_conditions_impact_response(journey),
                 "soc_uncertainty": TripService.build_journey_soc_uncertainty_response(
                     journey=journey,
                     estimated_arrival_soc_percent=final_arrival_soc
@@ -530,6 +984,8 @@ class TripService:
                 "prediction_impact": TripService.build_prediction_impact_response(
                     trip
                 ),
+                "traffic_impact": TripService.build_traffic_impact_response(trip),
+            "trip_conditions_impact": TripService.build_trip_conditions_impact_response(trip),
                 "soc_uncertainty": TripService.build_soc_uncertainty_response(
                     trip=trip,
                     estimated_arrival_soc_percent=arrival_soc_with_charging
