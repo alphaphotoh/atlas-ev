@@ -287,7 +287,7 @@ class GraphPlanner:
             total_detour_minutes
         )
 
-        stop_penalty = stops * 60.0
+        stop_penalty = stops * 90.0
 
         full_charge_penalty = 0.0
         high_departure_penalty = 0.0

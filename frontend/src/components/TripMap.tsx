@@ -39,7 +39,7 @@ function FitBounds({
           ]
         ],
         {
-          padding: [30, 30]
+          padding: [35, 35]
         }
       );
     }
@@ -61,8 +61,8 @@ function markerIcon(marker: MapMarker) {
   return L.divIcon({
     className: `atlas-marker atlas-marker-${marker.type}`,
     html: `<span>${label}</span>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15]
+    iconSize: [32, 32],
+    iconAnchor: [16, 16]
   });
 }
 
@@ -84,7 +84,21 @@ export function TripMap({
 
   return (
     <section className="card map-card">
-      <h2>Route Map</h2>
+      <div className="section-header">
+        <div>
+          <h2>Route Map</h2>
+          <p>
+            Route, waypoints, charging stops, and destination.
+          </p>
+        </div>
+
+        <div className="map-legend">
+          <span>O Origin</span>
+          <span>W Waypoint</span>
+          <span>1 Charger</span>
+          <span>D Destination</span>
+        </div>
+      </div>
 
       <MapContainer
         center={center}
@@ -97,7 +111,11 @@ export function TripMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        <Polyline positions={routePositions} />
+        <Polyline
+          positions={routePositions}
+          weight={5}
+          opacity={0.85}
+        />
 
         {mapData.markers.map((marker) => (
           <Marker
