@@ -1914,3 +1914,80 @@ select:focus {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.availability-backup-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.availability-backup-header em {
+  border-radius: 999px;
+  background: #171a20;
+  color: #ffffff;
+  padding: 6px 9px;
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.availability-selected-vs-backup {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.availability-selected-vs-backup article {
+  border: 1px solid #e8ebef;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.availability-selected-vs-backup article span {
+  color: #5c5e62;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.availability-selected-vs-backup article strong {
+  display: block;
+  margin-top: 4px;
+  color: #171a20;
+  font-size: 0.84rem;
+  line-height: 1.25;
+}
+
+.availability-selected-vs-backup article small {
+  display: block;
+  margin-top: 4px;
+  color: #5c5e62;
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.backup-option-card {
+  border-color: #b7c9e6 !important;
+  background: #f8fbff !important;
+}
+
+.availability-backup-metrics .delta-good {
+  color: #188455;
+}
+
+.availability-backup-metrics .delta-caution {
+  color: #b3263c;
+}
+
+.availability-backup-metrics .delta-neutral {
+  color: #171a20;
+}
+
+.availability-risk-card.compact .availability-selected-vs-backup {
+  display: none;
+}
