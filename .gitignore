@@ -30,4 +30,7 @@ git status
 
 frontend/node_modules/
 frontend/dist/
-frontend/.vite/
+frontend/.vite/.env
+data/
+frontend/tsconfig.tsbuildinfo
+scripts/
