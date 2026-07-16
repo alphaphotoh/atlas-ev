@@ -172,6 +172,206 @@ class TrafficImpactService:
         )
 
     @staticmethod
+    def build_from_live_result(
+        traffic_mode: str | None,
+        distance_km: float | None,
+        duration_minutes: float | None,
+        highway_ratio: float | None,
+        usable_battery_kwh: float | None,
+        live_result
+    ) -> TrafficImpact:
+        mode = TrafficImpactService.normalize_mode(
+            traffic_mode
+        )
+
+        if mode != "live":
+            return TrafficImpactService.build(
+                traffic_mode=traffic_mode,
+                distance_km=distance_km,
+                duration_minutes=duration_minutes,
+                highway_ratio=highway_ratio,
+                usable_battery_kwh=usable_battery_kwh
+            )
+
+        if not getattr(
+            live_result,
+            "available",
+            False
+        ):
+            fallback = TrafficImpactService.build(
+                traffic_mode="live",
+                traffic_level="moderate",
+                distance_km=distance_km,
+                duration_minutes=duration_minutes,
+                highway_ratio=highway_ratio,
+                usable_battery_kwh=usable_battery_kwh
+            )
+
+            warning = getattr(
+                live_result,
+                "warning",
+                None
+            )
+
+            if warning and warning not in fallback.warnings:
+                fallback.warnings.append(
+                    warning
+                )
+
+            return fallback
+
+        atlas_duration = TrafficImpactService.safe_float(
+            duration_minutes,
+            0.0
+        )
+
+        live_duration = TrafficImpactService.safe_float(
+            getattr(
+                live_result,
+                "live_duration_minutes",
+                None
+            ),
+            0.0
+        )
+
+        static_duration = TrafficImpactService.safe_float(
+            getattr(
+                live_result,
+                "static_duration_minutes",
+                None
+            ),
+            0.0
+        )
+
+        if atlas_duration <= 0 or live_duration <= 0 or static_duration <= 0:
+            return TrafficImpactService.build(
+                traffic_mode="live",
+                traffic_level="moderate",
+                distance_km=distance_km,
+                duration_minutes=duration_minutes,
+                highway_ratio=highway_ratio,
+                usable_battery_kwh=usable_battery_kwh
+            )
+
+        duration_multiplier = max(
+            live_duration / static_duration,
+            1.0
+        )
+
+        extra_duration = atlas_duration * (
+            duration_multiplier - 1
+        )
+
+        adjusted_duration = atlas_duration + extra_duration
+
+        live_delay_ratio = max(
+            duration_multiplier - 1,
+            0.0
+        )
+
+        if live_delay_ratio >= 0.15:
+            level = "heavy"
+
+        elif live_delay_ratio >= 0.07:
+            level = "moderate"
+
+        else:
+            level = "light"
+
+        highway_ratio = TrafficImpactService.clamp(
+            TrafficImpactService.safe_float(
+                highway_ratio,
+                0.8
+            ),
+            0.0,
+            1.0
+        )
+
+        distance_km = TrafficImpactService.safe_float(
+            distance_km,
+            0.0
+        )
+
+        usable_battery_kwh = TrafficImpactService.safe_float(
+            usable_battery_kwh,
+            0.0
+        )
+
+        estimated_delay = TrafficImpactService.estimated_delay_factor(
+            highway_ratio=highway_ratio,
+            level_multiplier=TrafficImpactService.LEVEL_MULTIPLIERS[level]
+        )
+
+        if estimated_delay <= 0:
+            estimated_delay = 0.01
+
+        scale = TrafficImpactService.clamp(
+            live_delay_ratio / estimated_delay,
+            0.25,
+            2.5
+        )
+
+        efficiency_adjustment = (
+            TrafficImpactService.estimated_efficiency_adjustment(
+                highway_ratio=highway_ratio,
+                level_multiplier=TrafficImpactService.LEVEL_MULTIPLIERS[level]
+            ) *
+            scale
+        )
+
+        energy_impact = (
+            distance_km *
+            efficiency_adjustment /
+            100
+        )
+
+        soc_impact = TrafficImpactService.soc_impact(
+            energy_kwh=energy_impact,
+            usable_battery_kwh=usable_battery_kwh
+        )
+
+        factors = [
+            "Traffic mode: live",
+            "Traffic provider: Google Routes",
+            f"Live traffic level: {level}",
+            f"Google live duration: {round(live_duration, 1)} min",
+            f"Google static duration: {round(static_duration, 1)} min"
+        ]
+
+        return TrafficImpact(
+            applied=True,
+            mode="live",
+            duration_multiplier=round(
+                duration_multiplier,
+                3
+            ),
+            extra_duration_minutes=round(
+                extra_duration,
+                1
+            ),
+            adjusted_duration_minutes=round(
+                adjusted_duration,
+                1
+            ),
+            efficiency_adjustment_kwh_per_100km=round(
+                efficiency_adjustment,
+                2
+            ),
+            energy_impact_kwh=round(
+                energy_impact,
+                2
+            ),
+            soc_impact_percent=TrafficImpactService.round_optional(
+                soc_impact
+            ),
+            traffic_level=level,
+            factors=TrafficImpactService.unique_list(
+                factors
+            ),
+            warnings=[]
+        )
+
+    @staticmethod
     def estimated_delay_factor(
         highway_ratio: float,
         level_multiplier: float

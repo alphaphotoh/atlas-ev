@@ -22,6 +22,9 @@ from backend.services.simulation.trip_conditions_service import (
 from backend.services.simulation.traffic_impact_service import (
     TrafficImpactService,
 )
+from backend.services.adapters.live_traffic_service import (
+    LiveTrafficService,
+)
 
 
 class TripBuilder:
@@ -190,14 +193,32 @@ class TripBuilder:
             or vehicle.usable_battery_kwh
         )
 
-        traffic_impact = TrafficImpactService.build(
-            traffic_mode=traffic_mode,
-            traffic_level=traffic_level,
-            distance_km=route.distance_km,
-            duration_minutes=route.duration_minutes,
-            highway_ratio=highway_ratio,
-            usable_battery_kwh=simulation_usable_battery_kwh
-        )
+        live_traffic_result = None
+
+        if traffic_mode == "live":
+            live_traffic_result = await LiveTrafficService.get_live_traffic_for_route(
+                route
+            )
+
+        if live_traffic_result is not None:
+            traffic_impact = TrafficImpactService.build_from_live_result(
+                traffic_mode=traffic_mode,
+                distance_km=route.distance_km,
+                duration_minutes=route.duration_minutes,
+                highway_ratio=highway_ratio,
+                usable_battery_kwh=simulation_usable_battery_kwh,
+                live_result=live_traffic_result
+            )
+
+        else:
+            traffic_impact = TrafficImpactService.build(
+                traffic_mode=traffic_mode,
+                traffic_level=traffic_level,
+                distance_km=route.distance_km,
+                duration_minutes=route.duration_minutes,
+                highway_ratio=highway_ratio,
+                usable_battery_kwh=simulation_usable_battery_kwh
+            )
 
         if traffic_impact.applied and traffic_impact.adjusted_duration_minutes:
             route.duration_minutes = traffic_impact.adjusted_duration_minutes
