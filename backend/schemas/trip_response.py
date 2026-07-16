@@ -73,6 +73,14 @@ class ChargingStopResponse(BaseModel):
     reliability_label: str | None = None
     availability_status: str | None = None
     is_live_availability: bool = False
+    available_stalls: int | None = None
+    occupied_stalls: int | None = None
+    total_stalls: int | None = None
+    occupancy_percent: float | None = None
+    availability_confidence: str | None = None
+    availability_source: str | None = None
+    availability_last_updated: str | None = None
+    availability_recommendation: str | None = None
     reliability_notes: list[str] = Field(default_factory=list)
 
     is_final_stop: bool

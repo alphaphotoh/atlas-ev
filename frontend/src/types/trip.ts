@@ -214,6 +214,14 @@ export interface ChargingStop {
   reliability_label?: string | null;
   availability_status?: string | null;
   is_live_availability?: boolean;
+  available_stalls?: number | null;
+  occupied_stalls?: number | null;
+  total_stalls?: number | null;
+  occupancy_percent?: number | null;
+  availability_confidence?: string | null;
+  availability_source?: string | null;
+  availability_last_updated?: string | null;
+  availability_recommendation?: string | null;
   reliability_notes?: string[];
 
   is_final_stop?: boolean;

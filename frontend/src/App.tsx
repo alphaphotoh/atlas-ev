@@ -58,6 +58,58 @@ function firstNumber(source: unknown, keys: string[]): number | null {
   return null;
 }
 
+function firstString(source: unknown, keys: string[]): string | null {
+  if (!source || typeof source !== "object") {
+    return null;
+  }
+
+  const record = source as Record<string, unknown>;
+
+  for (const key of keys) {
+    const value = record[key];
+
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+
+    if (typeof value === "number") {
+      return String(value);
+    }
+
+    if (typeof value === "boolean") {
+      return value ? "true" : "false";
+    }
+  }
+
+  return null;
+}
+
+function formatAvailabilityStatus(status: string | null) {
+  switch ((status ?? "unknown").toLowerCase()) {
+    case "available":
+      return "Available";
+    case "limited":
+      return "Limited";
+    case "busy":
+      return "Busy";
+    case "offline":
+      return "Offline";
+    case "unknown":
+    default:
+      return "Availability unknown";
+  }
+}
+
+function availabilityClass(status: string | null) {
+  const normalized = (status ?? "unknown").toLowerCase();
+
+  if (["available", "limited", "busy", "offline"].includes(normalized)) {
+    return normalized;
+  }
+
+  return "unknown";
+}
+
 function formatMinutes(value?: number | null) {
   if (value === null || value === undefined) {
     return "—";
@@ -245,6 +297,19 @@ function CompactChargingTimeline({
             "estimated_detour_minutes"
           ]);
 
+          const availabilityStatus = firstString(stop, [
+            "availability_status"
+          ]);
+
+          const isLiveAvailability =
+            firstString(stop, ["is_live_availability"]) === "true";
+
+          const availableStalls = firstNumber(stop, ["available_stalls"]);
+
+          const totalStalls = firstNumber(stop, ["total_stalls"]);
+
+          const occupancyPercent = firstNumber(stop, ["occupancy_percent"]);
+
           return (
             <div className="tesla-route-node charging-node" key={`${stop.name}-${index}`}>
               <div className="tesla-route-connector" />
@@ -266,6 +331,26 @@ function CompactChargingTimeline({
 
                   <small>
                     {detour === null ? "Detour —" : `${detour.toFixed(1)} min detour`}
+                  </small>
+                </div>
+
+                <div
+                  className={`tesla-availability-line ${availabilityClass(
+                    availabilityStatus
+                  )}`}
+                >
+                  <span className="tesla-availability-dot" />
+
+                  <strong>{formatAvailabilityStatus(availabilityStatus)}</strong>
+
+                  <small>
+                    {isLiveAvailability ? "Live" : "Not live"}
+                    {availableStalls !== null && totalStalls !== null
+                      ? ` · ${availableStalls}/${totalStalls} stalls`
+                      : ""}
+                    {occupancyPercent !== null
+                      ? ` · ${occupancyPercent.toFixed(0)}% occupied`
+                      : ""}
                   </small>
                 </div>
               </div>

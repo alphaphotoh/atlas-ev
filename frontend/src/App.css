@@ -1718,3 +1718,65 @@ select:focus {
   font-weight: 800;
   font-size: 0.74rem;
 }
+
+.tesla-availability-line {
+  display: grid;
+  grid-template-columns: 9px auto 1fr;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  border-radius: 12px;
+  background: #f4f4f4;
+  padding: 8px 10px;
+}
+
+.tesla-availability-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #8e8e93;
+}
+
+.tesla-availability-line strong {
+  font-size: 0.78rem;
+}
+
+.tesla-availability-line small {
+  color: #5c5e62;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.tesla-availability-line.available {
+  background: #f1fbf5;
+}
+
+.tesla-availability-line.available .tesla-availability-dot {
+  background: #188455;
+}
+
+.tesla-availability-line.limited {
+  background: #fff8e8;
+}
+
+.tesla-availability-line.limited .tesla-availability-dot {
+  background: #f0a018;
+}
+
+.tesla-availability-line.busy,
+.tesla-availability-line.offline {
+  background: #fff1f2;
+}
+
+.tesla-availability-line.busy .tesla-availability-dot,
+.tesla-availability-line.offline .tesla-availability-dot {
+  background: #b3263c;
+}
+
+.tesla-availability-line.unknown {
+  background: #f4f4f4;
+}
+
+.tesla-availability-line.unknown .tesla-availability-dot {
+  background: #8e8e93;
+}
