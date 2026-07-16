@@ -1,5 +1,9 @@
 from backend.models.battery_state import BatteryState
 
+from backend.services.routing.route_segment_service import (
+    RouteSegmentService,
+)
+
 
 class BatterySimulator:
     DEBUG = False
@@ -33,7 +37,11 @@ class BatterySimulator:
 
         elapsed_minutes = 0.0
 
-        for segment in route.segments:
+        segments = RouteSegmentService.segments_for_route(
+            route
+        )
+
+        for segment in segments:
             segment_efficiency = efficiency
 
             if efficiency_profile:

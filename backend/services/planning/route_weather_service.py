@@ -10,6 +10,10 @@ from backend.services.adapters.elevation_service import (
     ElevationService,
 )
 
+from backend.services.routing.route_segment_service import (
+    RouteSegmentService,
+)
+
 from backend.utils.async_utils import (
     AsyncUtils,
 )
@@ -23,161 +27,81 @@ class RouteWeatherService:
     async def sample(
         route
     ):
+        points = RouteSegmentService.sample_points(
+            route=route,
+            spacing_km=RouteWeatherService.SAMPLE_SPACING_KM
+        )
 
-        samples = []
+        if not points:
+            return []
 
         weather_tasks = []
-
         elevation_tasks = []
 
-        for segment in route.segments:
-
-            if (
-
-                segment.cumulative_distance_km %
-
-                RouteWeatherService.SAMPLE_SPACING_KM
-
-            ) > segment.length_km:
-
-                continue
-
-            latitude = segment.center_coordinate[1]
-
-            longitude = segment.center_coordinate[0]
-
+        for point in points:
             weather_tasks.append(
-
                 WeatherService.get_weather(
-
-                    latitude=latitude,
-
-                    longitude=longitude
-
+                    latitude=point["latitude"],
+                    longitude=point["longitude"]
                 )
-
             )
 
             elevation_tasks.append(
-
                 ElevationService.get_elevation(
-
-                    latitude=latitude,
-
-                    longitude=longitude
-
+                    latitude=point["latitude"],
+                    longitude=point["longitude"]
                 )
-
-            )
-
-            samples.append(
-
-                (
-
-                    segment.cumulative_distance_km,
-
-                    latitude,
-
-                    longitude
-
-                )
-
             )
 
         weather = await AsyncUtils.gather(
-
             weather_tasks
-
         )
 
         elevations = await AsyncUtils.gather(
-
             elevation_tasks
-
         )
 
         environment = []
-
         previous = None
 
-        for (
-
-            distance,
-
-            latitude,
-
-            longitude
-
-        ), current_weather, elevation in zip(
-
-            samples,
-
+        for point, current_weather, elevation in zip(
+            points,
             weather,
-
             elevations
-
         ):
-
             grade = 0.0
 
             if previous is not None:
-
                 distance_change = (
-
-                    distance -
-
-                    previous["distance"]
-
+                    point["distance_km"] -
+                    previous["distance_km"]
                 )
 
                 if distance_change > 0:
-
                     grade = (
-
                         (
-
                             elevation -
-
-                            previous["elevation"]
-
-                        )
-
-                        /
-
+                            previous["elevation_m"]
+                        ) /
                         (
-
                             distance_change * 1000
-
                         )
-
                     ) * 100
 
             environment.append(
-
                 EnvironmentSample(
-
-                    route_distance_km=distance,
-
-                    latitude=latitude,
-
-                    longitude=longitude,
-
+                    route_distance_km=point["distance_km"],
+                    latitude=point["latitude"],
+                    longitude=point["longitude"],
                     weather=current_weather,
-
                     elevation_m=elevation,
-
                     grade_percent=grade
-
                 )
-
             )
 
             previous = {
-
-                "distance": distance,
-
-                "elevation": elevation
-
+                "distance_km": point["distance_km"],
+                "elevation_m": elevation
             }
 
         return environment
