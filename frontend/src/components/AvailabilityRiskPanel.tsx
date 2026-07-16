@@ -500,6 +500,46 @@ export function AvailabilityRiskPanel({
   const isSaferBackup =
     Boolean(backup) && (risk.level === "medium" || risk.level === "high");
 
+  if (variant === "compact") {
+    return (
+      <section
+        className={`availability-risk-card compact modern-risk-card availability-risk-${risk.level} availability-recommendation-${saferRecommendation.level}`}
+      >
+        <div className="modern-risk-top">
+          <div>
+            <span>Availability</span>
+            <strong>{saferRecommendation.title}</strong>
+          </div>
+
+          <em>{saferRecommendation.badge}</em>
+        </div>
+
+        <p>{risk.reason}</p>
+
+        {backup ? (
+          <div className="modern-risk-pair">
+            <div>
+              <span>Selected</span>
+              <strong>{primaryName}</strong>
+            </div>
+
+            <div>
+              <span>Backup</span>
+              <strong>{backup.chargerName}</strong>
+            </div>
+          </div>
+        ) : (
+          <div className="modern-risk-pair single">
+            <div>
+              <span>Backup</span>
+              <strong>No backup found</strong>
+            </div>
+          </div>
+        )}
+      </section>
+    );
+  }
+
   return (
     <section
       className={`availability-risk-card availability-risk-${risk.level} availability-recommendation-${saferRecommendation.level} ${variant}`}

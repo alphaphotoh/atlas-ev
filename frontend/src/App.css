@@ -2062,3 +2062,92 @@ select:focus {
 .availability-recommendation-proceed {
   border-color: #ccebd5;
 }
+
+.modern-risk-card {
+  padding: 13px;
+  gap: 10px;
+}
+
+.modern-risk-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.modern-risk-top span,
+.modern-risk-pair span {
+  display: block;
+  color: #5c5e62;
+  font-size: 0.68rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.modern-risk-top strong {
+  display: block;
+  margin-top: 3px;
+  color: #171a20;
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.modern-risk-top em {
+  border-radius: 999px;
+  background: #171a20;
+  color: #ffffff;
+  padding: 6px 9px;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.modern-risk-card > p {
+  margin: 0;
+  color: #5c5e62;
+  font-size: 0.8rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.modern-risk-pair {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.modern-risk-pair div {
+  border-radius: 12px;
+  background: #f4f4f4;
+  padding: 9px 10px;
+}
+
+.modern-risk-pair strong {
+  display: block;
+  margin-top: 3px;
+  color: #171a20;
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.modern-risk-card.availability-recommendation-prepare .modern-risk-top em {
+  background: #fff3d1;
+  color: #a45e00;
+}
+
+.modern-risk-card.availability-recommendation-switch .modern-risk-top em {
+  background: #ffe6e9;
+  color: #b3263c;
+}
+
+.modern-risk-card.availability-recommendation-proceed .modern-risk-top em {
+  background: #f1fbf5;
+  color: #188455;
+}
+
+.modern-risk-card.availability-recommendation-review .modern-risk-top em {
+  background: #f1f2f4;
+  color: #393c41;
+}
