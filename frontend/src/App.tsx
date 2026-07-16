@@ -167,58 +167,120 @@ function CompactTripHeader({
 }
 
 function CompactChargingTimeline({
+  trip,
   chargingStops
 }: {
+  trip: TripResponse;
   chargingStops: ChargingStop[];
 }) {
-  if (chargingStops.length === 0) {
-    return (
-      <section className="tesla-timeline-card">
-        <h3>Charging</h3>
-        <p className="tesla-muted">No charging stop required for this trip.</p>
-      </section>
-    );
-  }
+  const finalSoc = firstNumber(trip.summary, [
+    "estimated_arrival_soc_percent",
+    "estimated_arrival_soc",
+    "final_soc_percent",
+    "arrival_soc_percent"
+  ]);
+
+  const totalTime = firstNumber(trip.summary, [
+    "total_time_minutes",
+    "total_trip_minutes"
+  ]);
+
+  const distanceKm = firstNumber(trip.summary, [
+    "distance_km",
+    "total_distance_km"
+  ]);
 
   return (
-    <section className="tesla-timeline-card">
-      <h3>Charging stops</h3>
+    <section className="tesla-route-timeline-card">
+      <div className="tesla-route-timeline-header">
+        <div>
+          <h3>Route timeline</h3>
+          <p>
+            {distanceKm === null ? "Distance unavailable" : `${distanceKm.toFixed(1)} km`}
+            {" · "}
+            {formatMinutes(totalTime)}
+          </p>
+        </div>
 
-      <div className="tesla-timeline">
-        {chargingStops.map((stop, index) => (
-          <div className="tesla-timeline-item" key={`${stop.name}-${index}`}>
-            <div className="tesla-timeline-dot">{index + 1}</div>
+        <span>
+          Arrive {formatPercent(finalSoc)}
+        </span>
+      </div>
 
-            <div>
-              <strong>{stop.charger_name ?? stop.name ?? "Charging stop"}</strong>
-              <span>
-                {formatMinutes(
-                  firstNumber(stop, [
-                    "charging_time_minutes",
-                    "charge_time_minutes",
-                    "time_minutes"
-                  ])
-                )}
-                {" · "}
-                {formatPercent(
-                  firstNumber(stop, [
-                    "arrival_soc_percent",
-                    "arrival_soc",
-                    "charger_arrival_soc_percent"
-                  ])
-                )}{" "}
-                →{" "}
-                {formatPercent(
-                  firstNumber(stop, [
-                    "departure_soc_percent",
-                    "departure_soc",
-                    "charger_departure_soc_percent"
-                  ])
-                )}
-              </span>
-            </div>
+      <div className="tesla-route-timeline">
+        <div className="tesla-route-node origin-node">
+          <div className="tesla-route-icon">O</div>
+          <div>
+            <strong>{trip.origin}</strong>
+            <span>Start</span>
           </div>
-        ))}
+        </div>
+
+        {chargingStops.map((stop, index) => {
+          const arriveSoc = firstNumber(stop, [
+            "arrival_soc_percent",
+            "arrival_soc",
+            "charger_arrival_soc_percent"
+          ]);
+
+          const leaveSoc = firstNumber(stop, [
+            "departure_soc_percent",
+            "departure_soc",
+            "charger_departure_soc_percent"
+          ]);
+
+          const chargeTime = firstNumber(stop, [
+            "charging_time_minutes",
+            "charge_time_minutes",
+            "time_minutes"
+          ]);
+
+          const energyAdded = firstNumber(stop, [
+            "energy_added_kwh",
+            "charge_added_kwh"
+          ]);
+
+          const detour = firstNumber(stop, [
+            "detour_minutes",
+            "estimated_detour_minutes"
+          ]);
+
+          return (
+            <div className="tesla-route-node charging-node" key={`${stop.name}-${index}`}>
+              <div className="tesla-route-connector" />
+              <div className="tesla-route-icon">{index + 1}</div>
+
+              <div className="tesla-route-node-body">
+                <strong>{stop.charger_name ?? stop.name ?? "Charging stop"}</strong>
+
+                <span>
+                  Charge {formatMinutes(chargeTime)}
+                  {" · "}
+                  {formatPercent(arriveSoc)} → {formatPercent(leaveSoc)}
+                </span>
+
+                <div className="tesla-route-mini-metrics">
+                  <small>
+                    {energyAdded === null ? "Energy —" : `${energyAdded.toFixed(1)} kWh added`}
+                  </small>
+
+                  <small>
+                    {detour === null ? "Detour —" : `${detour.toFixed(1)} min detour`}
+                  </small>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        <div className="tesla-route-node destination-node">
+          <div className="tesla-route-connector" />
+          <div className="tesla-route-icon">D</div>
+          <div>
+            <strong>{trip.destination}</strong>
+            <span>Arrive with {formatPercent(finalSoc)}</span>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -307,7 +369,7 @@ function App() {
             <>
               <CompactTripHeader trip={trip} chargingStops={chargingStops} />
 
-              <CompactChargingTimeline chargingStops={chargingStops} />
+              <CompactChargingTimeline trip={trip} chargingStops={chargingStops} />
 
               <button
                 className="tesla-details-button"

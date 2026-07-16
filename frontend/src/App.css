@@ -1594,3 +1594,127 @@ select:focus {
     grid-template-columns: 1fr;
   }
 }
+
+.tesla-route-timeline-card {
+  border: 1px solid #e4e6ea;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.tesla-route-timeline-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.tesla-route-timeline-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #171a20;
+}
+
+.tesla-route-timeline-header p {
+  margin: 4px 0 0;
+  color: #5c5e62;
+  font-weight: 700;
+  font-size: 0.84rem;
+}
+
+.tesla-route-timeline-header > span {
+  border-radius: 999px;
+  background: #f1f2f4;
+  color: #171a20;
+  padding: 7px 10px;
+  font-weight: 900;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.tesla-route-timeline {
+  display: grid;
+  gap: 0;
+}
+
+.tesla-route-node {
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+  padding: 0 0 18px;
+}
+
+.tesla-route-node:last-child {
+  padding-bottom: 0;
+}
+
+.tesla-route-connector {
+  position: absolute;
+  left: 16px;
+  top: -18px;
+  width: 2px;
+  height: 18px;
+  background: #d8dce2;
+}
+
+.tesla-route-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #171a20;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 950;
+  z-index: 1;
+}
+
+.origin-node .tesla-route-icon {
+  background: #188455;
+}
+
+.charging-node .tesla-route-icon {
+  background: #f0a018;
+}
+
+.destination-node .tesla-route-icon {
+  background: #b3263c;
+}
+
+.tesla-route-node strong {
+  display: block;
+  color: #171a20;
+  font-size: 0.94rem;
+  line-height: 1.25;
+}
+
+.tesla-route-node span {
+  display: block;
+  color: #5c5e62;
+  font-weight: 750;
+  font-size: 0.82rem;
+  margin-top: 4px;
+}
+
+.tesla-route-node-body {
+  min-width: 0;
+}
+
+.tesla-route-mini-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.tesla-route-mini-metrics small {
+  border-radius: 999px;
+  background: #f4f4f4;
+  color: #393c41;
+  padding: 6px 9px;
+  font-weight: 800;
+  font-size: 0.74rem;
+}
