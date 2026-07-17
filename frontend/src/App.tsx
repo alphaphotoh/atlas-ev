@@ -127,6 +127,37 @@ function getFinalSoc(summary: unknown): number | null {
   ]);
 }
 
+function getRouteAverageSpeed(summary: unknown): number | null {
+  const distanceKm = firstNumber(summary, [
+    "distance_km",
+    "total_distance_km"
+  ]);
+
+  const drivingMinutes = firstNumber(summary, [
+    "driving_minutes",
+    "driving_time_minutes"
+  ]);
+
+  if (
+    distanceKm === null ||
+    drivingMinutes === null ||
+    distanceKm <= 0 ||
+    drivingMinutes <= 0
+  ) {
+    return null;
+  }
+
+  return distanceKm / (drivingMinutes / 60);
+}
+
+function formatSpeed(value: number | null) {
+  if (value === null) {
+    return "—";
+  }
+
+  return `${value.toFixed(1)} km/h`;
+}
+
 function formatMinutes(value?: number | null) {
   if (value === null || value === undefined) {
     return "—";
@@ -194,6 +225,11 @@ function CompactTripHeader({
               ])
             )}
           </strong>
+        </div>
+
+        <div>
+          <span>Avg speed</span>
+          <strong>{formatSpeed(getRouteAverageSpeed(trip.summary))}</strong>
         </div>
 
         <div>
