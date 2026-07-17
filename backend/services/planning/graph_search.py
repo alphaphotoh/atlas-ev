@@ -1,3 +1,4 @@
+import asyncio
 import copy
 
 from backend.models.trip_node import TripNode
@@ -13,8 +14,9 @@ from backend.services.simulation.charging_time_service import ChargingTimeServic
 
 
 class GraphSearch:
-    MAX_CANDIDATES = 12
-    MAX_CHILDREN = 48
+    MAX_CANDIDATES = 4
+    MAX_CHILDREN = 10
+    CHARGE_OPTION_TIMEOUT_SECONDS = 18.0
     DETOUR_SPEED_KMH = 50
 
     @staticmethod
@@ -127,11 +129,21 @@ class GraphSearch:
         children = []
 
         for candidate in candidates:
-            charge_options = await DepartureOptimizer.optimize_options(
-                trip=node.trip,
-                charger=candidate.charger,
-                arrival_soc=candidate.arrival_soc
-            )
+            try:
+                charge_options = await asyncio.wait_for(
+                    DepartureOptimizer.optimize_options(
+                        trip=node.trip,
+                        charger=candidate.charger,
+                        arrival_soc=candidate.arrival_soc
+                    ),
+                    timeout=GraphSearch.CHARGE_OPTION_TIMEOUT_SECONDS,
+                )
+            except Exception as error:
+                PlannerLogger.log()
+                PlannerLogger.log(
+                    f"Charge option timeout/error for {candidate.charger.name}: {error}"
+                )
+                continue
 
             target_soc = node.trip.planning.target_destination_soc
 

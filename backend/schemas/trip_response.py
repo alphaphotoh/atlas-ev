@@ -285,6 +285,7 @@ class TripResponse(BaseModel):
     waypoint_mode: str | None = None
 
     route_legs: list[RouteLegResponse]
+    charging_stops: list[ChargingStopResponse] | None = None
     charging_plan: ChargingPlanResponse
     alternative_plans: AlternativePlansResponse
     alternative_plans_by_leg: list[AlternativePlansForRouteLegResponse] | None = None

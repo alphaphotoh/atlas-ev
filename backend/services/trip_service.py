@@ -715,6 +715,7 @@ class TripService:
             "waypoints": waypoints,
             "waypoint_mode": waypoint_mode,
             "route_legs": route_legs,
+            "charging_stops": charging_stops,
             "charging_plan": {
                 "charging_required": trip_planning_status["charging_required"],
                 "stops": len(charging_stops),
@@ -905,6 +906,7 @@ class TripService:
                     ]
                 }
             ],
+            "charging_stops": charging_stops,
             "charging_plan": {
                 "charging_required": leg_status["charging_required"],
                 "stops": len(charging_stops),

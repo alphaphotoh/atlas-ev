@@ -1,3 +1,4 @@
+import asyncio
 from backend.services.planning.trip_builder import TripBuilder
 from backend.services.simulation.charge_curve import ChargeCurve
 
@@ -19,66 +20,132 @@ class DepartureOptimizer:
         return options[-1]
 
     @staticmethod
-    async def optimize_options(trip, charger, arrival_soc):
-        planning = trip.planning
+    async def optimize_options(
+        trip,
+        charger,
+        arrival_soc
+    ):
+        from backend.services.planning.trip_builder import TripBuilder
 
-        target_soc = DepartureOptimizer.destination_target_soc(
-            trip
-        )
-
-        limit_soc = DepartureOptimizer.limit_soc(
-            planning
-        )
-
-        low_soc = DepartureOptimizer.round_soc(
-            max(
-                arrival_soc,
-                0.0
-            )
-        )
-
-        low_soc = min(
-            low_soc,
-            limit_soc
-        )
-
-        low_trip = await TripBuilder.build(
+        departure_socs = DepartureOptimizer.fast_departure_soc_options(
             trip=trip,
-            charger=charger,
-            departure_soc=low_soc,
+            arrival_soc=arrival_soc,
         )
 
-        if DepartureOptimizer.destination_soc(low_trip) >= target_soc:
-            return [
-                (
-                    low_soc,
-                    low_trip,
+        async def build_option(departure_soc):
+            try:
+                next_trip = await asyncio.wait_for(
+                    TripBuilder.build(
+                        trip=trip,
+                        charger=charger,
+                        departure_soc=departure_soc,
+                    ),
+                    timeout=12.0,
                 )
+
+                if next_trip is None:
+                    return None
+
+                return (
+                    departure_soc,
+                    next_trip,
+                )
+            except TimeoutError:
+                return None
+            except Exception:
+                return None
+
+        results = await asyncio.gather(
+            *[
+                build_option(departure_soc)
+                for departure_soc in departure_socs
+            ],
+            return_exceptions=True,
+        )
+
+        options = []
+
+        for result in results:
+            if isinstance(result, Exception):
+                continue
+
+            if result is not None:
+                options.append(result)
+
+        return options
+
+
+    @staticmethod
+    def fast_departure_soc_options(
+        trip,
+        arrival_soc
+    ):
+        planning = getattr(
+            trip,
+            "planning",
+            None,
+        )
+
+        target_destination_soc = getattr(
+            planning,
+            "target_destination_soc",
+            25.0,
+        )
+
+        route = getattr(
+            trip,
+            "route",
+            None,
+        )
+
+        route_distance_km = getattr(
+            route,
+            "distance_km",
+            0.0,
+        ) or 0.0
+
+        arrival_soc = float(arrival_soc or 0.0)
+
+        minimum_departure = max(
+            arrival_soc + 8.0,
+            target_destination_soc + 10.0,
+        )
+
+        if route_distance_km >= 700:
+            raw_options = [
+                85.0,
+                100.0,
+            ]
+        elif route_distance_km >= 400:
+            raw_options = [
+                80.0,
+                100.0,
+            ]
+        else:
+            raw_options = [
+                minimum_departure,
+                85.0,
             ]
 
-        high_trip = await TripBuilder.build(
-            trip=trip,
-            charger=charger,
-            departure_soc=limit_soc,
-        )
+        options = []
 
-        if DepartureOptimizer.destination_soc(high_trip) >= target_soc:
-            return await DepartureOptimizer.final_destination_option(
-                trip=trip,
-                charger=charger,
-                low_soc=low_soc,
-                high_soc=limit_soc,
-                target_soc=target_soc,
-                high_trip=high_trip,
+        for value in raw_options:
+            value = round(
+                max(
+                    arrival_soc,
+                    min(100.0, float(value)),
+                ),
+                1,
             )
 
-        return await DepartureOptimizer.non_final_options(
-            trip=trip,
-            charger=charger,
-            arrival_soc=arrival_soc,
-            low_soc=low_soc,
-            limit_soc=limit_soc,
-        )
+            if value <= arrival_soc:
+                continue
+
+            if value not in options:
+                options.append(value)
+
+        return options[:2]
+
 
     @staticmethod
     async def non_final_options(
