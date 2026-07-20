@@ -27,7 +27,7 @@ export interface TripRequest {
   destination: string;
   starting_soc: number;
   average_speed: number;
-  highway_ratio: number;
+  highway_ratio?: number;
   traffic_mode?: TrafficMode;
   traffic_level?: TrafficLevel | null;
   trip_conditions?: TripConditions | null;

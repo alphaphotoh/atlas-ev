@@ -62,7 +62,6 @@ export function TripForm({
   const [trafficLevel, setTrafficLevel] = useState<TrafficLevel>("moderate");
 
   const [startingSoc, setStartingSoc] = useState("100");
-  const [highwayRatio, setHighwayRatio] = useState("0.8");
 
   const [showConditions, setShowConditions] = useState(false);
 
@@ -143,7 +142,6 @@ export function TripForm({
       waypoint_mode: waypointMode,
       starting_soc: Number(startingSoc),
       average_speed: 90,
-      highway_ratio: Number(highwayRatio),
       traffic_mode: trafficMode,
       traffic_level: trafficMode === "none" ? undefined : trafficLevel
     };
@@ -237,21 +235,7 @@ export function TripForm({
               required
             />
           </label>
-
-          <label>
-            Highway Ratio
-            <input
-              type="number"
-              min="0"
-              max="1"
-              step="0.1"
-              value={highwayRatio}
-              onChange={(event) => setHighwayRatio(event.target.value)}
-              required
-            />
-          </label>
-
-          <label>
+<label>
             Traffic Mode
             <select
               value={trafficMode}

@@ -1,3 +1,4 @@
+from backend.services.simulation.route_speed_service import RouteSpeedService
 from backend.models.trip_plan import TripPlan
 from backend.models.simulation_context import SimulationContext
 
@@ -146,6 +147,17 @@ class TripBuilder:
         traffic_level=None,
         trip_conditions=None
     ):
+        speed_estimate = RouteSpeedService.estimate(
+            route=route,
+            fallback_average_speed_kmh=average_speed,
+        )
+        average_speed = speed_estimate.average_speed_kmh
+
+        try:
+            setattr(route, "speed_estimate", speed_estimate)
+        except Exception:
+            pass
+
         weather = await WeatherService.get_weather(
             latitude=origin_coords[1],
             longitude=origin_coords[0]
