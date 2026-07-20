@@ -15,7 +15,7 @@ export interface TripConditions {
   battery_degradation_percent?: number;
 }
 
-export type TrafficMode = "none" | "estimated" | "live";
+export type TrafficMode = "live";
 
 export type TrafficLevel = "light" | "moderate" | "heavy";
 

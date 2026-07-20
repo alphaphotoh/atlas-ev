@@ -626,7 +626,7 @@ class TripService:
         starting_soc: float,
         average_speed: float,
         highway_ratio: float,
-        traffic_mode="none",
+        traffic_mode="live",
         traffic_level=None,
         trip_conditions=None,
         waypoint_mode: str = "required_stops"

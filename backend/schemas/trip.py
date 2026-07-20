@@ -42,7 +42,7 @@ class TripRequest(BaseModel):
         "none",
         "estimated",
         "live"
-    ] = "none"
+    ] = "live"
 
     traffic_level: Literal[
         "light",

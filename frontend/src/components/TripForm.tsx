@@ -1,8 +1,6 @@
 import { FormEvent, useState } from "react";
 
 import type {
-  TrafficLevel,
-  TrafficMode,
   TripConditions,
   TripRequest,
   WaypointMode
@@ -58,8 +56,6 @@ export function TripForm({
   const [destination, setDestination] = useState("Ottawa, ON");
   const [waypoints, setWaypoints] = useState("Kingston, ON\ncornwall, ON");
   const [waypointMode, setWaypointMode] = useState<WaypointMode>("via_points");
-  const [trafficMode, setTrafficMode] = useState<TrafficMode>("none");
-  const [trafficLevel, setTrafficLevel] = useState<TrafficLevel>("moderate");
 
   const [startingSoc, setStartingSoc] = useState("100");
 
@@ -142,8 +138,8 @@ export function TripForm({
       waypoint_mode: waypointMode,
       starting_soc: Number(startingSoc),
       average_speed: 90,
-      traffic_mode: trafficMode,
-      traffic_level: trafficMode === "none" ? undefined : trafficLevel
+      traffic_mode: "live",
+      traffic_level: undefined
     };
 
     if (tripConditions) {
@@ -235,36 +231,7 @@ export function TripForm({
               required
             />
           </label>
-<label>
-            Traffic Mode
-            <select
-              value={trafficMode}
-              onChange={(event) =>
-                setTrafficMode(event.target.value as TrafficMode)
-              }
-            >
-              <option value="none">None</option>
-              <option value="estimated">Estimated traffic</option>
-              <option value="live">Live traffic</option>
-            </select>
-          </label>
-
-          <label>
-            Traffic Level
-            <select
-              value={trafficLevel}
-              onChange={(event) =>
-                setTrafficLevel(event.target.value as TrafficLevel)
-              }
-              disabled={trafficMode === "none"}
-            >
-              <option value="light">Light</option>
-              <option value="moderate">Moderate</option>
-              <option value="heavy">Heavy</option>
-            </select>
-          </label>
-
-        </div>
+</div>
 
         <div className="optional-section">
           <button

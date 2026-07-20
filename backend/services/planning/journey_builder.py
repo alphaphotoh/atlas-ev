@@ -14,7 +14,7 @@ class JourneyBuilder:
         starting_soc,
         average_speed,
         highway_ratio,
-        traffic_mode="none",
+        traffic_mode="live",
         traffic_level=None,
         trip_conditions=None
     ):
