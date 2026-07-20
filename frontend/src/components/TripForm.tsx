@@ -52,8 +52,8 @@ export function TripForm({
   onSubmit,
   loading
 }: TripFormProps) {
-  const [origin, setOrigin] = useState("Pickering, ON");
-  const [destination, setDestination] = useState("Ottawa, ON");
+  const [origin, setOrigin] = useState("");
+  const [destination, setDestination] = useState("");
   const [waypoints, setWaypoints] = useState("Kingston, ON\ncornwall, ON");
   const [waypointMode, setWaypointMode] = useState<WaypointMode>("via_points");
 
