@@ -17,6 +17,10 @@ class VeryLongTripFallbackPlanner:
     MIN_ARRIVAL_SOC = 5.0
     PREFERRED_MIN_ARRIVAL_SOC = 10.0
     LOW_SOC_RESCUE_MIN_ARRIVAL_SOC = 2.0
+    INTERMEDIATE_TARGET_SOC = 98.0
+    SPARSE_FINAL_ZONE_KM = 650.0
+    INTERMEDIATE_TARGET_SOC = 98.0
+    SPARSE_FINAL_ZONE_KM = 650.0
     TARGET_CHARGER_ARRIVAL_SOC = 16.0
     LONG_ROUTE_THRESHOLD_KM = 1000.0
 
@@ -430,18 +434,53 @@ class VeryLongTripFallbackPlanner:
             + soc_needed_after_charger
         )
 
-        minimum_charge_buffer_soc = arrival_soc + 8.0
+        minimum_departure_soc = arrival_soc + 8.0
 
-        return round(
-            max(
-                minimum_charge_buffer_soc,
+        # Low-SOC rescue stop:
+        # If the planner has to arrive below the preferred safety target,
+        # force enough charging buffer so the next leg is not razor-thin.
+        if arrival_soc < VeryLongTripFallbackPlanner.PREFERRED_MIN_ARRIVAL_SOC:
+            minimum_departure_soc = max(
+                minimum_departure_soc,
+                arrival_soc + 30.0,
+                35.0,
+            )
+
+        # Destination reachable from this charger:
+        # Charge only enough to arrive with target destination SOC,
+        # while still respecting low-SOC buffer rules.
+        if required_departure_soc <= 100.0:
+            return round(
                 min(
                     100.0,
-                    required_departure_soc,
+                    max(
+                        minimum_departure_soc,
+                        required_departure_soc,
+                    ),
+                ),
+                1,
+            )
+
+        # Sparse final zone:
+        # Charge to 100% only when needed because the next stretch has limited
+        # charger coverage.
+        if remaining_after_charger_km <= VeryLongTripFallbackPlanner.SPARSE_FINAL_ZONE_KM:
+            return 100.0
+
+        # Normal intermediate stop:
+        # 98% avoids most of the slow 98-100% top-off but prevents extra stops
+        # on sparse 2000+ km routes.
+        return round(
+            min(
+                100.0,
+                max(
+                    minimum_departure_soc,
+                    VeryLongTripFallbackPlanner.INTERMEDIATE_TARGET_SOC,
                 ),
             ),
             1,
         )
+
 
     @staticmethod
     def populate_candidate(trip, next_trip, candidate, departure_soc):
