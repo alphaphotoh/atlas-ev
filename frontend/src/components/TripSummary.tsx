@@ -330,6 +330,24 @@ function TrafficImpactPanel({
   const factors = impact.factors ?? [];
   const warnings = impact.warnings ?? [];
 
+  const liveTrafficUnavailable =
+    impact.mode === "live" &&
+    (
+      warnings.some((warning) =>
+        warning.toLowerCase().includes("fallback") ||
+        warning.toLowerCase().includes("unavailable") ||
+        warning.toLowerCase().includes("google")
+      ) ||
+      factors.some((factor) =>
+        factor.toLowerCase().includes("fallback") ||
+        factor.toLowerCase().includes("estimated traffic") ||
+        factor.toLowerCase().includes("live traffic unavailable")
+      )
+    );
+
+  const liveTrafficConnected =
+    impact.mode === "live" && !liveTrafficUnavailable;
+
   return (
     <section className="impact-panel traffic-impact">
       <div className="impact-header">
@@ -341,6 +359,21 @@ function TrafficImpactPanel({
           </p>
         </div>
       </div>
+
+      {liveTrafficUnavailable && (
+        <div className="warnings traffic-live-alert">
+          <div>
+            Live traffic was requested automatically, but Google live traffic was not available for this route.
+            Atlas used fallback traffic estimates instead.
+          </div>
+        </div>
+      )}
+
+      {liveTrafficConnected && (
+        <div className="mode-note">
+          Live traffic connected through Google Routes.
+        </div>
+      )}
 
       <div className="impact-grid">
         <div>
