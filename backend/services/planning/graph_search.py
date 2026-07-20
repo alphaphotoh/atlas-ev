@@ -14,9 +14,32 @@ from backend.services.simulation.charging_time_service import ChargingTimeServic
 
 
 class GraphSearch:
-    MAX_CANDIDATES = 4
-    MAX_CHILDREN = 10
-    CHARGE_OPTION_TIMEOUT_SECONDS = 18.0
+    MAX_CANDIDATES = 6
+    MAX_CHILDREN = 8
+    CHARGE_OPTION_TIMEOUT_SECONDS = 6.0
+
+    @staticmethod
+    def candidate_limit_for_trip(trip):
+        route = getattr(trip, "route", None)
+        distance_km = getattr(route, "distance_km", 0.0) or 0.0
+
+        if distance_km >= 650:
+            return 3
+
+        return GraphSearch.MAX_CANDIDATES
+
+
+    @staticmethod
+    def child_limit_for_trip(trip):
+        route = getattr(trip, "route", None)
+        distance_km = getattr(route, "distance_km", 0.0) or 0.0
+
+        if distance_km >= 650:
+            return 3
+
+        return GraphSearch.MAX_CHILDREN
+
+
     DETOUR_SPEED_KMH = 50
 
     @staticmethod
@@ -111,18 +134,29 @@ class GraphSearch:
         PlannerLogger.log(f"Rejected visited charger: {rejected_visited}")
         PlannerLogger.log(f"Viable candidates before limit: {len(candidates)}")
 
-        candidates.sort(
-            key=lambda candidate: (
-                GraphSearch.arrival_soc_penalty(
-                    candidate,
-                    node.trip.planning
-                ),
-                candidate.charger.detour_distance_km or 0.0,
-                -(candidate.charger.power_kw or 0.0)
-            )
-        )
+        route_distance_km = getattr(node.trip.route, "distance_km", 0.0) or 0.0
 
-        candidates = candidates[:GraphSearch.MAX_CANDIDATES]
+        if route_distance_km >= 700:
+            candidates.sort(
+                key=lambda candidate: (
+                    abs((candidate.arrival_soc or 0.0) - 18.0),
+                    candidate.charger.detour_distance_km or 0.0,
+                    -(candidate.charger.power_kw or 0.0)
+                )
+            )
+        else:
+            candidates.sort(
+                key=lambda candidate: (
+                    GraphSearch.arrival_soc_penalty(
+                        candidate,
+                        node.trip.planning
+                    ),
+                    candidate.charger.detour_distance_km or 0.0,
+                    -(candidate.charger.power_kw or 0.0)
+                )
+            )
+
+        candidates = candidates[:GraphSearch.candidate_limit_for_trip(node.trip)]
 
         PlannerLogger.log(f"Candidates considered: {len(candidates)}")
 
@@ -291,7 +325,7 @@ class GraphSearch:
             )
         )
 
-        children = children[:GraphSearch.MAX_CHILDREN]
+        children = children[:GraphSearch.child_limit_for_trip(node.trip)]
 
         PlannerLogger.log()
         PlannerLogger.log(f"Children created: {len(children)}")

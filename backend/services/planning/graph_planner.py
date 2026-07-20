@@ -7,9 +7,9 @@ from backend.services.planning.planner_logger import PlannerLogger
 
 
 class GraphPlanner:
-    MAX_EXPANSIONS = 10
-    MAX_COMPLETED = 8
-    MAX_FRONTIER = 32
+    MAX_EXPANSIONS = 30
+    MAX_COMPLETED = 2
+    MAX_FRONTIER = 40
 
     DETOUR_SPEED_KMH = 50
 

@@ -466,6 +466,158 @@ class TripService:
     MIN_SAFE_ARRIVAL_SOC = 10.0
 
     @staticmethod
+    def low_soc_charging_stop_warnings(charging_stops):
+        warnings = []
+
+        for stop in charging_stops or []:
+            arrival_soc = stop.get(
+                "arrival_soc"
+            )
+
+            if arrival_soc is None:
+                continue
+
+            try:
+                arrival_soc = float(
+                    arrival_soc
+                )
+            except Exception:
+                continue
+
+            if arrival_soc >= TripService.MIN_SAFE_ARRIVAL_SOC:
+                continue
+
+            stop_number = stop.get(
+                "stop",
+                "?"
+            )
+
+            charger_name = (
+                stop.get("charger_name")
+                or stop.get("name")
+                or "Unknown charger"
+            )
+
+            warning = (
+                f"Low SOC arrival at charging stop {stop_number} "
+                f"({charger_name}): estimated arrival SOC "
+                f"{arrival_soc:.1f}%, below the safe target of "
+                f"{TripService.MIN_SAFE_ARRIVAL_SOC:.1f}%. "
+                "Use a backup charger, reduce speed, or charge earlier if possible."
+            )
+
+            if warning not in warnings:
+                warnings.append(
+                    warning
+                )
+
+            notes = stop.get(
+                "reliability_notes",
+                []
+            ) or []
+
+            note = (
+                f"Low SOC arrival warning: estimated arrival SOC "
+                f"{arrival_soc:.1f}% is below the preferred "
+                f"{TripService.MIN_SAFE_ARRIVAL_SOC:.1f}% safety target."
+            )
+
+            if note not in notes:
+                notes.append(
+                    note
+                )
+
+            stop["reliability_notes"] = notes
+
+        return warnings
+
+    @staticmethod
+    def charging_stop_safety_warnings(charging_stops):
+        warnings = []
+
+        for stop in charging_stops or []:
+            arrival_soc = stop.get(
+                "arrival_soc"
+            )
+
+            if arrival_soc is None:
+                continue
+
+            try:
+                arrival_soc = float(
+                    arrival_soc
+                )
+            except Exception:
+                continue
+
+            if arrival_soc >= TripService.MIN_SAFE_ARRIVAL_SOC:
+                continue
+
+            stop_number = stop.get(
+                "stop",
+                "?"
+            )
+
+            charger_name = (
+                stop.get("charger_name")
+                or stop.get("name")
+                or "Unknown charger"
+            )
+
+            warning = (
+                f"Low SOC arrival at charging stop {stop_number} "
+                f"({charger_name}): estimated arrival SOC "
+                f"{arrival_soc:.1f}%, below the safe target of "
+                f"{TripService.MIN_SAFE_ARRIVAL_SOC:.1f}%. "
+                "Use a backup charger, reduce speed, or charge earlier if possible."
+            )
+
+            if warning not in warnings:
+                warnings.append(
+                    warning
+                )
+
+        return warnings
+
+    @staticmethod
+    def add_charging_stop_safety_notes(charging_stops):
+        for stop in charging_stops or []:
+            arrival_soc = stop.get(
+                "arrival_soc"
+            )
+
+            if arrival_soc is None:
+                continue
+
+            try:
+                arrival_soc = float(
+                    arrival_soc
+                )
+            except Exception:
+                continue
+
+            if arrival_soc >= TripService.MIN_SAFE_ARRIVAL_SOC:
+                continue
+
+            notes = stop.get(
+                "reliability_notes",
+                []
+            ) or []
+
+            note = (
+                f"Low SOC arrival warning: estimated arrival SOC "
+                f"{arrival_soc:.1f}% is below the preferred "
+                f"{TripService.MIN_SAFE_ARRIVAL_SOC:.1f}% safety target."
+            )
+
+            if note not in notes:
+                notes.append(
+                    note
+                )
+
+            stop["reliability_notes"] = notes
+
+    @staticmethod
     async def build_trip(
         vehicle_id: str,
         origin: str,
@@ -686,6 +838,28 @@ class TripService:
         trip_planning_status = TripService.build_trip_planning_status(
             route_legs
         )
+
+        TripService.add_charging_stop_safety_notes(
+            charging_stops
+        )
+
+        charging_safety_warnings = TripService.charging_stop_safety_warnings(
+            charging_stops
+        )
+
+        trip_planning_status["warnings"] = list(
+            trip_planning_status.get(
+                "warnings",
+                []
+            )
+        )
+
+        for warning in charging_safety_warnings:
+            if warning not in trip_planning_status["warnings"]:
+                trip_planning_status["warnings"].append(
+                    warning
+                )
+
 
         final_arrival_soc = 0.0
 
@@ -1047,6 +1221,16 @@ class TripService:
 
         else:
             planning_status = "charging_planned"
+
+        low_soc_warnings = TripService.low_soc_charging_stop_warnings(
+            charging_stops
+        )
+
+        for warning in low_soc_warnings:
+            if warning not in warnings:
+                warnings.append(
+                    warning
+                )
 
         return {
             "charging_required": charging_required,

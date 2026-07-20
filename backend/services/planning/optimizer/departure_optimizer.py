@@ -26,22 +26,36 @@ class DepartureOptimizer:
         arrival_soc
     ):
         from backend.services.planning.trip_builder import TripBuilder
+        from backend.services.planning.approx_trip_builder import ApproxTripBuilder
 
         departure_socs = DepartureOptimizer.fast_departure_soc_options(
             trip=trip,
             arrival_soc=arrival_soc,
         )
 
+        route_distance_km = getattr(
+            trip.route,
+            "distance_km",
+            0.0,
+        ) or 0.0
+
         async def build_option(departure_soc):
             try:
-                next_trip = await asyncio.wait_for(
-                    TripBuilder.build(
+                if route_distance_km >= 650:
+                    next_trip = ApproxTripBuilder.build_after_charger(
                         trip=trip,
                         charger=charger,
                         departure_soc=departure_soc,
-                    ),
-                    timeout=12.0,
-                )
+                    )
+                else:
+                    next_trip = await asyncio.wait_for(
+                        TripBuilder.build(
+                            trip=trip,
+                            charger=charger,
+                            departure_soc=departure_soc,
+                        ),
+                        timeout=8.0,
+                    )
 
                 if next_trip is None:
                     return None
@@ -50,8 +64,6 @@ class DepartureOptimizer:
                     departure_soc,
                     next_trip,
                 )
-            except TimeoutError:
-                return None
             except Exception:
                 return None
 
@@ -111,20 +123,21 @@ class DepartureOptimizer:
             target_destination_soc + 10.0,
         )
 
-        if route_distance_km >= 700:
+        if route_distance_km >= 650:
             raw_options = [
-                85.0,
                 100.0,
             ]
-        elif route_distance_km >= 400:
+        elif route_distance_km >= 300:
             raw_options = [
-                80.0,
+                minimum_departure,
+                85.0,
                 100.0,
             ]
         else:
             raw_options = [
                 minimum_departure,
-                85.0,
+                75.0,
+                95.0,
             ]
 
         options = []
@@ -144,7 +157,7 @@ class DepartureOptimizer:
             if value not in options:
                 options.append(value)
 
-        return options[:2]
+        return options[:3]
 
 
     @staticmethod
