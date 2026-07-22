@@ -22,7 +22,11 @@ class TripExpander:
             trip
         )
 
-        if TripExpander.result_is_usable(
+        needs_charging = TripExpander.trip_needs_charging(
+            trip
+        )
+
+        if not needs_charging and TripExpander.result_is_usable(
             result=graph_result,
             trip=trip,
         ):
@@ -32,11 +36,28 @@ class TripExpander:
             trip
         )
 
-        if TripExpander.result_is_usable(
+        graph_usable = TripExpander.result_is_usable(
+            result=graph_result,
+            trip=trip,
+        )
+
+        fallback_usable = TripExpander.result_is_usable(
             result=fallback_result,
             trip=trip,
-        ):
+        )
+
+        if graph_usable and fallback_usable:
+            return TripExpander.better_result(
+                graph_result,
+                fallback_result,
+                trip,
+            )
+
+        if fallback_usable:
             return fallback_result
+
+        if graph_usable:
+            return graph_result
 
         if (
             fallback_result is not None
@@ -186,13 +207,11 @@ class TripExpander:
             None,
         )
 
-        possible_sources = [
+        for source in [
             recommended,
             itinerary,
             result,
-        ]
-
-        for source in possible_sources:
+        ]:
             if source is None:
                 continue
 
@@ -208,9 +227,7 @@ class TripExpander:
                 )
 
                 if isinstance(value, list):
-                    return len(
-                        value,
-                    )
+                    return len(value)
 
         legs = getattr(
             itinerary,
@@ -219,19 +236,11 @@ class TripExpander:
         )
 
         if isinstance(legs, list):
-            count = 0
-
-            for leg in legs:
-                charger = getattr(
-                    leg,
-                    "charger",
-                    None,
-                )
-
-                if charger is not None:
-                    count += 1
-
-            return count
+            return sum(
+                1
+                for leg in legs
+                if getattr(leg, "charger", None) is not None
+            )
 
         completed = getattr(
             result,
@@ -240,11 +249,98 @@ class TripExpander:
         )
 
         if isinstance(completed, list):
-            return len(
-                completed,
-            )
+            return len(completed)
 
         return 0
+
+    @staticmethod
+    def better_result(
+        first_result,
+        second_result,
+        trip,
+    ):
+        first_minutes = TripExpander.result_total_minutes(
+            first_result,
+            trip,
+        )
+
+        second_minutes = TripExpander.result_total_minutes(
+            second_result,
+            trip,
+        )
+
+        if second_minutes < first_minutes:
+            return second_result
+
+        return first_result
+
+    @staticmethod
+    def result_total_minutes(
+        result,
+        trip,
+    ):
+        itinerary = TripExpander.itinerary_from_result(
+            result
+        )
+
+        route = getattr(
+            trip,
+            "route",
+            None,
+        )
+
+        driving_minutes = getattr(
+            route,
+            "duration_minutes",
+            0.0,
+        ) or 0.0
+
+        charging_minutes = 0.0
+        detour_minutes = 0.0
+
+        for leg in getattr(
+            itinerary,
+            "legs",
+            [],
+        ):
+            candidate = getattr(
+                leg,
+                "selected_result",
+                None,
+            )
+
+            if candidate is None:
+                continue
+
+            charging_minutes += float(
+                getattr(
+                    candidate,
+                    "charging_time_minutes",
+                    0.0,
+                ) or 0.0
+            )
+
+            charger = getattr(
+                candidate,
+                "charger",
+                None,
+            )
+
+            detour_km = getattr(
+                charger,
+                "detour_distance_km",
+                0.0,
+            ) or 0.0
+
+            # Same rough detour conversion currently used in TripService:
+            # 14.07 km -> about 16.9 min.
+            detour_minutes += float(detour_km) * 1.2
+
+        return (
+            float(driving_minutes)
+            + charging_minutes
+            + detour_minutes
+        )
 
     @staticmethod
     def itinerary_from_result(result):

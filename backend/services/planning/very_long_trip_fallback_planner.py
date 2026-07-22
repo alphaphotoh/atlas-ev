@@ -19,8 +19,6 @@ class VeryLongTripFallbackPlanner:
     LOW_SOC_RESCUE_MIN_ARRIVAL_SOC = 2.0
     INTERMEDIATE_TARGET_SOC = 98.0
     SPARSE_FINAL_ZONE_KM = 650.0
-    INTERMEDIATE_TARGET_SOC = 98.0
-    SPARSE_FINAL_ZONE_KM = 650.0
     TARGET_CHARGER_ARRIVAL_SOC = 16.0
     LONG_ROUTE_THRESHOLD_KM = 1000.0
 
@@ -28,11 +26,8 @@ class VeryLongTripFallbackPlanner:
     async def plan(trip):
         route_distance = VeryLongTripFallbackPlanner.route_distance_km(trip)
 
-        if route_distance < VeryLongTripFallbackPlanner.LONG_ROUTE_THRESHOLD_KM:
-            return None
-
         PlannerLogger.log()
-        PlannerLogger.log("========== VERY LONG TRIP FALLBACK ==========")
+        PlannerLogger.log("========== CHARGING FALLBACK PLANNER ==========")
         PlannerLogger.log(f"Initial route distance: {route_distance:.1f} km")
 
         itinerary = TripItinerary()
@@ -155,10 +150,10 @@ class VeryLongTripFallbackPlanner:
             )
 
         if completed_node is None:
-            PlannerLogger.log("Very long trip fallback did not complete.")
+            PlannerLogger.log("Charging fallback planner did not complete.")
             return None
 
-        PlannerLogger.log("Very long trip fallback completed.")
+        PlannerLogger.log("Charging fallback planner completed.")
         PlannerLogger.log(f"Stops: {len(itinerary.legs)}")
 
         return TripPlanningResult(
@@ -264,14 +259,76 @@ class VeryLongTripFallbackPlanner:
         else:
             sortable_candidates = candidates
 
+        # Prefer chargers close to the route first.
+        # A charger with perfect arrival SOC but a huge detour is usually worse
+        # than a slightly earlier/later charger that stays on-route.
+        near_route_candidates = [
+            candidate
+            for candidate in sortable_candidates
+            if (
+                getattr(
+                    candidate.charger,
+                    "detour_distance_km",
+                    9999.0,
+                ) or 9999.0
+            ) <= 35.0
+        ]
+
+        if near_route_candidates:
+            sortable_candidates = near_route_candidates
+        else:
+            medium_detour_candidates = [
+                candidate
+                for candidate in sortable_candidates
+                if (
+                    getattr(
+                        candidate.charger,
+                        "detour_distance_km",
+                        9999.0,
+                    ) or 9999.0
+                ) <= 60.0
+            ]
+
+            if medium_detour_candidates:
+                sortable_candidates = medium_detour_candidates
+
+        efficient_arrival_candidates = [
+            candidate
+            for candidate in sortable_candidates
+            if (
+                candidate.arrival_soc >= preferred_min_soc
+                and candidate.arrival_soc <= 50.0
+            )
+        ]
+
+        if efficient_arrival_candidates:
+            sortable_candidates = efficient_arrival_candidates
+
         sortable_candidates.sort(
             key=lambda candidate: (
+                getattr(
+                    candidate.charger,
+                    "detour_distance_km",
+                    9999.0,
+                ) or 9999.0,
                 abs(
                     candidate.arrival_soc
                     - VeryLongTripFallbackPlanner.TARGET_CHARGER_ARRIVAL_SOC
                 ),
-                getattr(candidate.charger, "detour_distance_km", 9999.0) or 9999.0,
-                -(getattr(candidate.charger, "power_kw", 0.0) or 0.0),
+                -(
+                    getattr(
+                        candidate.charger,
+                        "power_kw",
+                        0.0,
+                    ) or 0.0
+                ),
+                -(
+                    getattr(
+                        candidate.charger,
+                        "route_distance_km",
+                        0.0,
+                    ) or 0.0
+                ),
             )
         )
 
@@ -432,64 +489,9 @@ class VeryLongTripFallbackPlanner:
         )
 
         # Destination is reachable from this charger.
-        # Keep the original final-stop calculation.
+        # Keep exact final-stop calculation.
         if target_destination_soc + soc_needed_to_destination <= 100.0:
             return base_departure_soc
-
-        # Build a temporary remaining trip assuming full charge only to discover
-        # the next useful charger. Then charge only enough to reach that charger.
-        temp_trip = VeryLongTripFallbackPlanner.build_next_trip(
-            trip=trip,
-            candidate=candidate,
-            departure_soc=100.0,
-        )
-
-        next_visited = set(
-            visited or set()
-        )
-
-        next_visited.add(
-            VeryLongTripFallbackPlanner.charger_id(
-                candidate.charger
-            )
-        )
-
-        next_candidate = await VeryLongTripFallbackPlanner.best_candidate(
-            current_trip=temp_trip,
-            visited=next_visited,
-        )
-
-        if next_candidate is None:
-            return base_departure_soc
-
-        next_charger_distance_km = getattr(
-            next_candidate.charger,
-            "route_distance_km",
-            0.0,
-        ) or 0.0
-
-        if next_charger_distance_km <= 0:
-            return base_departure_soc
-
-        desired_arrival_soc = 14.0
-
-        if next_charger_distance_km >= 350:
-            desired_arrival_soc = 16.0
-
-        if next_charger_distance_km <= 220:
-            desired_arrival_soc = 18.0
-
-        soc_needed_to_next_charger = (
-            float(next_charger_distance_km)
-            * efficiency
-            / usable_battery
-            * 100.0
-        )
-
-        required_departure_soc = (
-            desired_arrival_soc
-            + soc_needed_to_next_charger
-        )
 
         arrival_soc = float(
             getattr(
@@ -508,36 +510,65 @@ class VeryLongTripFallbackPlanner:
                 35.0,
             )
 
-        target_soc = max(
-            minimum_departure_soc,
-            required_departure_soc,
+        next_visited = set(
+            visited or set()
         )
 
-        # Snap to practical charging bands. This avoids repeatedly charging
-        # into the slow top of the curve unless the next gap needs it.
-        if target_soc <= 80.0:
-            target_soc = 80.0
-        elif target_soc <= 85.0:
-            target_soc = 85.0
-        elif target_soc <= 90.0:
-            target_soc = 90.0
-        elif target_soc <= 95.0:
-            target_soc = 95.0
-        elif target_soc <= 98.0:
-            target_soc = 98.0
-        else:
-            target_soc = 100.0
+        next_visited.add(
+            VeryLongTripFallbackPlanner.charger_id(
+                candidate.charger
+            )
+        )
 
-        return round(
-            min(
-                100.0,
+        # ABRP-style curve-friendly feasibility search:
+        # Prefer the fast charging zone first. Only go higher when a lower
+        # departure SOC cannot reach any useful next charger.
+        bands = [
+            60.0,
+            65.0,
+            70.0,
+            75.0,
+            80.0,
+            85.0,
+            90.0,
+            95.0,
+            98.0,
+            100.0,
+        ]
+
+        for band in bands:
+            departure_soc = round(
                 max(
                     minimum_departure_soc,
-                    target_soc,
+                    band,
                 ),
-            ),
-            1,
-        )
+                1,
+            )
+
+            if departure_soc > 100.0:
+                continue
+
+            test_trip = VeryLongTripFallbackPlanner.build_next_trip(
+                trip=trip,
+                candidate=candidate,
+                departure_soc=departure_soc,
+            )
+
+            if VeryLongTripFallbackPlanner.is_complete(
+                test_trip
+            ):
+                return departure_soc
+
+            next_candidate = await VeryLongTripFallbackPlanner.best_candidate(
+                current_trip=test_trip,
+                visited=next_visited,
+            )
+
+            if next_candidate is not None:
+                return departure_soc
+
+        return base_departure_soc
+
 
     @staticmethod
     def departure_soc_for_candidate(trip, candidate):
