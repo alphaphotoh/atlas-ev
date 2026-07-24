@@ -16,31 +16,46 @@ from backend.services.simulation.charging_time_service import ChargingTimeServic
 class GraphSearch:
     MAX_CANDIDATES = 6
     MAX_CHILDREN = 8
-    CHARGE_OPTION_TIMEOUT_SECONDS = 6.0
+    CHARGE_OPTION_TIMEOUT_SECONDS = 3.0
+    DETOUR_SPEED_KMH = 50
 
     @staticmethod
     def candidate_limit_for_trip(trip):
-        route = getattr(trip, "route", None)
-        distance_km = getattr(route, "distance_km", 0.0) or 0.0
+        route = getattr(
+            trip,
+            "route",
+            None,
+        )
+
+        distance_km = getattr(
+            route,
+            "distance_km",
+            0.0,
+        ) or 0.0
 
         if distance_km >= 650:
             return 3
 
         return GraphSearch.MAX_CANDIDATES
 
-
     @staticmethod
     def child_limit_for_trip(trip):
-        route = getattr(trip, "route", None)
-        distance_km = getattr(route, "distance_km", 0.0) or 0.0
+        route = getattr(
+            trip,
+            "route",
+            None,
+        )
+
+        distance_km = getattr(
+            route,
+            "distance_km",
+            0.0,
+        ) or 0.0
 
         if distance_km >= 650:
             return 3
 
         return GraphSearch.MAX_CHILDREN
-
-
-    DETOUR_SPEED_KMH = 50
 
     @staticmethod
     async def expand(node: TripNode):
@@ -140,8 +155,20 @@ class GraphSearch:
             candidates.sort(
                 key=lambda candidate: (
                     abs((candidate.arrival_soc or 0.0) - 18.0),
+                    GraphSearch.power_quality_penalty(
+                        candidate,
+                        node.trip.planning,
+                    ),
+                    GraphSearch.network_quality_penalty(
+                        candidate,
+                        node.trip.planning,
+                    ),
+                    GraphSearch.backup_quality_penalty(
+                        candidate,
+                        node.trip.planning,
+                    ),
                     candidate.charger.detour_distance_km or 0.0,
-                    -(candidate.charger.power_kw or 0.0)
+                    -GraphSearch.charger_power_kw(candidate)
                 )
             )
         else:
@@ -151,8 +178,20 @@ class GraphSearch:
                         candidate,
                         node.trip.planning
                     ),
+                    GraphSearch.power_quality_penalty(
+                        candidate,
+                        node.trip.planning,
+                    ),
+                    GraphSearch.network_quality_penalty(
+                        candidate,
+                        node.trip.planning,
+                    ),
+                    GraphSearch.backup_quality_penalty(
+                        candidate,
+                        node.trip.planning,
+                    ),
                     candidate.charger.detour_distance_km or 0.0,
-                    -(candidate.charger.power_kw or 0.0)
+                    -GraphSearch.charger_power_kw(candidate)
                 )
             )
 
@@ -234,10 +273,46 @@ class GraphSearch:
                     GraphSearch.DETOUR_SPEED_KMH
                 ) * 60
 
+                power_quality_penalty_minutes = (
+                    GraphSearch.power_quality_penalty(
+                        option_candidate,
+                        node.trip.planning,
+                    )
+                )
+
+                option_candidate.power_quality_penalty_minutes = (
+                    power_quality_penalty_minutes
+                )
+
+                network_quality_penalty_minutes = (
+                    GraphSearch.network_quality_penalty(
+                        option_candidate,
+                        node.trip.planning,
+                    )
+                )
+
+                option_candidate.network_quality_penalty_minutes = (
+                    network_quality_penalty_minutes
+                )
+
+                backup_quality_penalty_minutes = (
+                    GraphSearch.backup_quality_penalty(
+                        option_candidate,
+                        node.trip.planning,
+                    )
+                )
+
+                option_candidate.backup_quality_penalty_minutes = (
+                    backup_quality_penalty_minutes
+                )
+
                 option_candidate.total_trip_time_minutes = round(
                     next_trip.route.duration_minutes +
                     charging_time +
-                    detour_minutes,
+                    detour_minutes +
+                    power_quality_penalty_minutes +
+                    network_quality_penalty_minutes +
+                    backup_quality_penalty_minutes,
                     1
                 )
 
@@ -369,6 +444,389 @@ class GraphSearch:
             round(charger.latitude, 6),
             round(charger.longitude, 6)
         )
+
+    @staticmethod
+    def charger_power_kw(candidate):
+        charger = getattr(
+            candidate,
+            "charger",
+            candidate,
+        )
+
+        fields = [
+            "power_kw",
+            "max_power_kw",
+            "maximum_power_kw",
+            "dc_power_kw",
+            "rated_power_kw",
+        ]
+
+        for field in fields:
+            value = getattr(
+                charger,
+                field,
+                None,
+            )
+
+            if value is None:
+                continue
+
+            try:
+                power = float(value)
+            except Exception:
+                continue
+
+            if power > 0:
+                return power
+
+        connections = getattr(
+            charger,
+            "connections",
+            None,
+        )
+
+        if not connections:
+            connections = getattr(
+                charger,
+                "connection_info",
+                None,
+            )
+
+        if not connections:
+            return 0.0
+
+        best_power = 0.0
+
+        for connection in connections:
+            for field in fields:
+                if isinstance(connection, dict):
+                    value = connection.get(field)
+                else:
+                    value = getattr(
+                        connection,
+                        field,
+                        None,
+                    )
+
+                if value is None:
+                    continue
+
+                try:
+                    power = float(value)
+                except Exception:
+                    continue
+
+                if power > best_power:
+                    best_power = power
+
+        return best_power
+
+    @staticmethod
+    def power_quality_penalty(
+        candidate,
+        planning,
+    ):
+        def safe_float(value, default):
+            try:
+                return float(value)
+            except Exception:
+                return float(default)
+
+        power_kw = GraphSearch.charger_power_kw(
+            candidate
+        )
+
+        minimum_power_kw = safe_float(
+            getattr(
+                planning,
+                "minimum_dc_power_kw",
+                50.0,
+            ),
+            50.0,
+        )
+
+        preferred_power_kw = safe_float(
+            getattr(
+                planning,
+                "preferred_dc_power_kw",
+                150.0,
+            ),
+            150.0,
+        )
+
+        unknown_penalty = safe_float(
+            getattr(
+                planning,
+                "unknown_power_penalty_minutes",
+                20.0,
+            ),
+            20.0,
+        )
+
+        slow_penalty = safe_float(
+            getattr(
+                planning,
+                "slow_charger_penalty_minutes",
+                15.0,
+            ),
+            15.0,
+        )
+
+        if power_kw <= 0:
+            return unknown_penalty
+
+        if power_kw < minimum_power_kw:
+            return slow_penalty + 30.0
+
+        if power_kw < 100.0:
+            return slow_penalty + round(
+                (100.0 - power_kw) * 0.15,
+                1,
+            )
+
+        if power_kw < preferred_power_kw:
+            return round(
+                min(
+                    10.0,
+                    (preferred_power_kw - power_kw) * 0.08,
+                ),
+                1,
+            )
+
+        return 0.0
+
+    @staticmethod
+    def network_quality_penalty(
+        candidate,
+        planning,
+    ):
+        def safe_float(value, default):
+            try:
+                return float(value)
+            except Exception:
+                return float(default)
+
+        charger = getattr(
+            candidate,
+            "charger",
+            candidate,
+        )
+
+        name = str(
+            getattr(
+                charger,
+                "name",
+                "",
+            ) or ""
+        ).strip()
+
+        network = str(
+            getattr(
+                charger,
+                "network",
+                getattr(
+                    charger,
+                    "operator",
+                    getattr(
+                        charger,
+                        "operator_name",
+                        getattr(
+                            charger,
+                            "provider",
+                            "",
+                        ),
+                    ),
+                ),
+            ) or ""
+        ).strip()
+
+        combined = f"{network} {name}".lower()
+
+        unknown_network_penalty = safe_float(
+            getattr(
+                planning,
+                "unknown_network_penalty_minutes",
+                15.0,
+            ),
+            15.0,
+        )
+
+        weak_network_penalty = safe_float(
+            getattr(
+                planning,
+                "weak_network_penalty_minutes",
+                8.0,
+            ),
+            8.0,
+        )
+
+        low_reliability_penalty = safe_float(
+            getattr(
+                planning,
+                "low_reliability_network_penalty_minutes",
+                18.0,
+            ),
+            18.0,
+        )
+
+        trusted_tokens = [
+            "electrify canada",
+            "electrify america",
+            "tesla",
+            "chargepoint",
+            "evgo",
+            "flo",
+            "shell recharge",
+            "circle k",
+            "pilot",
+            "flying j",
+            "ivy",
+            "petro-canada",
+            "mercedes",
+            "gm energy",
+        ]
+
+        semi_trusted_tokens = [
+            "xcharge",
+            "blink",
+            "ev connect",
+            "volta",
+            "evgateway",
+        ]
+
+        reliability_score = getattr(
+            charger,
+            "reliability_score",
+            None,
+        )
+
+        if reliability_score is not None:
+            try:
+                reliability_score = float(reliability_score)
+            except Exception:
+                reliability_score = None
+
+        if reliability_score is not None and reliability_score < 0.45:
+            return low_reliability_penalty
+
+        if any(token in combined for token in trusted_tokens):
+            return 0.0
+
+        if any(token in combined for token in semi_trusted_tokens):
+            if "unknown" in combined or "(unknown operator)" in combined:
+                return weak_network_penalty
+            return max(
+                0.0,
+                weak_network_penalty - 4.0,
+            )
+
+        if (
+            not network
+            or "unknown" in network.lower()
+            or "(unknown operator)" in combined
+        ):
+            return unknown_network_penalty
+
+        return weak_network_penalty
+
+    @staticmethod
+    def backup_quality_penalty(
+        candidate,
+        planning,
+    ):
+        def safe_float(value, default):
+            try:
+                return float(value)
+            except Exception:
+                return float(default)
+
+        charger = getattr(
+            candidate,
+            "charger",
+            candidate,
+        )
+
+        availability = str(
+            getattr(
+                charger,
+                "availability_status",
+                getattr(
+                    candidate,
+                    "availability_status",
+                    "",
+                ),
+            ) or ""
+        ).lower()
+
+        reliability_label = str(
+            getattr(
+                charger,
+                "reliability_label",
+                getattr(
+                    candidate,
+                    "reliability_label",
+                    "",
+                ),
+            ) or ""
+        ).lower()
+
+        backup = getattr(
+            charger,
+            "backup_charger",
+            getattr(
+                candidate,
+                "backup_charger",
+                None,
+            ),
+        )
+
+        backup_found = bool(backup)
+
+        backup_count = getattr(
+            charger,
+            "backup_charger_count",
+            getattr(
+                candidate,
+                "backup_charger_count",
+                0,
+            ),
+        )
+
+        try:
+            backup_count = int(backup_count or 0)
+        except Exception:
+            backup_count = 0
+
+        no_backup_penalty = safe_float(
+            getattr(
+                planning,
+                "no_backup_penalty_minutes",
+                7.0,
+            ),
+            7.0,
+        )
+
+        unknown_availability_penalty = safe_float(
+            getattr(
+                planning,
+                "unknown_availability_penalty_minutes",
+                3.0,
+            ),
+            3.0,
+        )
+
+        penalty = 0.0
+
+        if not backup_found and backup_count <= 0:
+            penalty += no_backup_penalty
+
+        if "unknown" in availability:
+            penalty += unknown_availability_penalty
+
+        if "poor" in reliability_label or "low" in reliability_label:
+            penalty += no_backup_penalty
+
+        return round(penalty, 1)
 
     @staticmethod
     def arrival_soc_penalty(candidate, planning):

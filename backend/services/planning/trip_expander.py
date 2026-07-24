@@ -1,3 +1,4 @@
+import asyncio
 import copy
 
 from backend.models.trip_itinerary import TripItinerary
@@ -28,9 +29,17 @@ class TripExpander:
             trip
         )
 
-        graph_result = await GraphPlanner.plan_with_alternatives(
-            graph_trip
-        )
+        try:
+            graph_result = await asyncio.wait_for(
+                GraphPlanner.plan_with_alternatives(
+                    trip
+                ),
+                timeout=20.0,
+            )
+        except asyncio.TimeoutError:
+            graph_result = None
+        except Exception:
+            graph_result = None
 
         needs_charging = TripExpander.trip_needs_charging(
             trip
