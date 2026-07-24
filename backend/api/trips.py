@@ -40,7 +40,9 @@ async def plan_trip(request: TripRequest):
         "destination": request.destination,
         "starting_soc": request.starting_soc,
         "average_speed": request.average_speed,
-        "highway_ratio": request.highway_ratio
+        "highway_ratio": request.highway_ratio,
+        "planning_mode": getattr(request, "planning_mode", "conservative"),
+        "highway_speed_kmh": getattr(request, "highway_speed_kmh", None)
     }
 
     signature = inspect.signature(

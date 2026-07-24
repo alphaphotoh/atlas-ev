@@ -98,11 +98,35 @@ class DepartureOptimizer:
             None,
         )
 
-        target_destination_soc = getattr(
-            planning,
-            "target_destination_soc",
+        def safe_float(value, default):
+            try:
+                return float(value)
+            except Exception:
+                return float(default)
+
+        target_destination_soc = safe_float(
+            getattr(
+                planning,
+                "target_destination_soc",
+                25.0,
+            ),
             25.0,
         )
+
+        planning_mode = str(
+            getattr(
+                planning,
+                "planning_mode",
+                "conservative",
+            ) or "conservative"
+        ).lower()
+
+        is_fastest = planning_mode in {
+            "fastest",
+            "abrp",
+            "abrp_style",
+            "fastest_abrp",
+        }
 
         route = getattr(
             trip,
@@ -116,29 +140,84 @@ class DepartureOptimizer:
             0.0,
         ) or 0.0
 
-        arrival_soc = float(arrival_soc or 0.0)
+        arrival_soc = safe_float(
+            arrival_soc,
+            0.0,
+        )
 
         minimum_departure = max(
             arrival_soc + 8.0,
             target_destination_soc + 10.0,
         )
 
-        if route_distance_km >= 650:
-            raw_options = [
-                100.0,
-            ]
-        elif route_distance_km >= 300:
-            raw_options = [
-                minimum_departure,
+        if is_fastest:
+            charge_limit_soc = safe_float(
+                getattr(
+                    planning,
+                    "road_trip_charge_limit",
+                    85.0,
+                ),
                 85.0,
-                100.0,
-            ]
-        else:
-            raw_options = [
+            )
+
+            charge_limit_soc = max(
                 minimum_departure,
-                75.0,
-                95.0,
-            ]
+                min(
+                    85.0,
+                    charge_limit_soc,
+                ),
+            )
+
+            if route_distance_km >= 300:
+                raw_options = [
+                    max(minimum_departure, 55.0),
+                    max(minimum_departure, 65.0),
+                    max(minimum_departure, 75.0),
+                    charge_limit_soc,
+                ]
+            else:
+                raw_options = [
+                    minimum_departure,
+                    max(minimum_departure, 55.0),
+                    max(minimum_departure, 65.0),
+                    min(charge_limit_soc, 75.0),
+                ]
+        else:
+            charge_limit_soc = safe_float(
+                getattr(
+                    planning,
+                    "road_trip_charge_limit",
+                    100.0,
+                ),
+                100.0,
+            )
+
+            charge_limit_soc = max(
+                minimum_departure,
+                min(
+                    100.0,
+                    charge_limit_soc,
+                ),
+            )
+
+            if route_distance_km >= 650:
+                raw_options = [
+                    85.0,
+                    95.0,
+                    100.0,
+                ]
+            elif route_distance_km >= 300:
+                raw_options = [
+                    minimum_departure,
+                    85.0,
+                    100.0,
+                ]
+            else:
+                raw_options = [
+                    minimum_departure,
+                    75.0,
+                    95.0,
+                ]
 
         options = []
 
@@ -146,7 +225,11 @@ class DepartureOptimizer:
             value = round(
                 max(
                     arrival_soc,
-                    min(100.0, float(value)),
+                    min(
+                        100.0,
+                        charge_limit_soc,
+                        float(value),
+                    ),
                 ),
                 1,
             )
@@ -157,8 +240,10 @@ class DepartureOptimizer:
             if value not in options:
                 options.append(value)
 
-        return options[:3]
+        if is_fastest:
+            return options[:4]
 
+        return options[:3]
 
     @staticmethod
     async def non_final_options(

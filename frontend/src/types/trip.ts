@@ -1,5 +1,7 @@
 export type WaypointMode = "required_stops" | "via_points";
 
+export type PlanningMode = "conservative" | "fastest";
+
 export interface TripConditions {
   passengers?: number;
   cargo_weight_kg?: number;
@@ -28,6 +30,8 @@ export interface TripRequest {
   starting_soc: number;
   average_speed: number;
   highway_ratio?: number;
+  planning_mode?: PlanningMode;
+  highway_speed_kmh?: number;
   traffic_mode?: TrafficMode;
   traffic_level?: TrafficLevel | null;
   trip_conditions?: TripConditions | null;

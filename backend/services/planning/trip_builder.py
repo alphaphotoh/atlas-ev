@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from backend.services.simulation.route_speed_service import RouteSpeedService
 from backend.models.trip_plan import TripPlan
 from backend.models.simulation_context import SimulationContext
@@ -42,7 +43,9 @@ class TripBuilder:
         highway_ratio,
         traffic_mode="live",
         traffic_level=None,
-        trip_conditions=None
+        trip_conditions=None,
+        planning_mode="conservative",
+        highway_speed_kmh=None
     ):
         origin_data = await GeocodingService.search(
             origin
@@ -74,7 +77,9 @@ class TripBuilder:
             highway_ratio=highway_ratio,
             traffic_mode=traffic_mode,
             traffic_level=traffic_level,
-            trip_conditions=trip_conditions
+            trip_conditions=trip_conditions,
+            planning_mode=planning_mode,
+            highway_speed_kmh=highway_speed_kmh
         )
 
     @staticmethod
@@ -88,7 +93,9 @@ class TripBuilder:
         highway_ratio,
         traffic_mode="live",
         traffic_level=None,
-        trip_conditions=None
+        trip_conditions=None,
+        planning_mode="conservative",
+        highway_speed_kmh=None
     ):
         origin_data = await GeocodingService.search(
             origin
@@ -132,7 +139,9 @@ class TripBuilder:
             highway_ratio=highway_ratio,
             traffic_mode=traffic_mode,
             traffic_level=traffic_level,
-            trip_conditions=trip_conditions
+            trip_conditions=trip_conditions,
+            planning_mode=planning_mode,
+            highway_speed_kmh=highway_speed_kmh
         )
 
     @staticmethod
@@ -145,7 +154,9 @@ class TripBuilder:
         highway_ratio,
         traffic_mode="live",
         traffic_level=None,
-        trip_conditions=None
+        trip_conditions=None,
+        planning_mode="conservative",
+        highway_speed_kmh=None
     ):
         speed_estimate = RouteSpeedService.estimate(
             route=route,
@@ -167,6 +178,37 @@ class TripBuilder:
             vehicle=vehicle,
             route=route
         )
+
+        planning_mode = TripBuilder.normalize_planning_mode(
+            planning_mode
+        )
+
+        highway_speed_kmh = TripBuilder.normalize_highway_speed(
+            highway_speed_kmh
+        )
+
+        planning = getattr(
+            trip,
+            "planning",
+            None,
+        )
+
+        if planning is None:
+            planning = SimpleNamespace()
+
+        planning.planning_mode = planning_mode
+        planning.target_destination_soc = TripBuilder.target_destination_soc_for_mode(
+            planning_mode
+        )
+        planning.highway_speed_kmh = highway_speed_kmh
+
+        if not hasattr(planning, "minimum_dc_power_kw"):
+            planning.minimum_dc_power_kw = 50.0
+
+        if not hasattr(planning, "maximum_detour_km"):
+            planning.maximum_detour_km = 35.0
+
+        trip.planning = planning
 
         trip.environment_samples = await RouteWeatherService.sample(
             route
@@ -239,6 +281,7 @@ class TripBuilder:
             RouteSpeedService.apply_long_highway_duration_normalization(
                 route=route,
                 highway_ratio=highway_ratio,
+                target_speed_kmh=highway_speed_kmh,
             )
         )
 
@@ -597,6 +640,44 @@ class TripBuilder:
         )
 
         return route
+
+    @staticmethod
+    def normalize_planning_mode(mode):
+        if mode == "fastest":
+            return "fastest"
+
+        return "conservative"
+
+    @staticmethod
+    def target_destination_soc_for_mode(mode):
+        if TripBuilder.normalize_planning_mode(mode) == "fastest":
+            return 15.0
+
+        return 25.0
+
+    @staticmethod
+    def normalize_highway_speed(value):
+        if value is None:
+            return None
+
+        try:
+            speed = float(value)
+        except Exception:
+            return None
+
+        if speed <= 0:
+            return None
+
+        return round(
+            max(
+                75.0,
+                min(
+                    125.0,
+                    speed,
+                ),
+            ),
+            1,
+        )
 
     @staticmethod
     def get_learning_correction_factor(vehicle):

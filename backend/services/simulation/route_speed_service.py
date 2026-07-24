@@ -71,6 +71,7 @@ class RouteSpeedService:
     def apply_long_highway_duration_normalization(
         route: Any,
         highway_ratio: float | None,
+        target_speed_kmh: float | None = None,
     ) -> float | None:
         distance_km = RouteSpeedService._read_float(
             route,
@@ -97,20 +98,21 @@ class RouteSpeedService:
         if duration_minutes <= 0:
             return None
 
-        current_speed = distance_km / (duration_minutes / 60.0)
+        target_speed = RouteSpeedService._normalize_highway_target_speed(
+            target_speed_kmh
+        )
 
-        if current_speed >= RouteSpeedService.LONG_HIGHWAY_TARGET_SPEED_KMH:
-            return None
+        current_speed = distance_km / (duration_minutes / 60.0)
 
         normalized_duration = (
             distance_km
-            / RouteSpeedService.LONG_HIGHWAY_TARGET_SPEED_KMH
+            / target_speed
             * 60.0
         )
 
-        gain_minutes = duration_minutes - normalized_duration
+        duration_delta_minutes = duration_minutes - normalized_duration
 
-        if gain_minutes < RouteSpeedService.LONG_HIGHWAY_MIN_GAIN_MINUTES:
+        if abs(duration_delta_minutes) < 5.0:
             return None
 
         normalized_duration = round(
@@ -120,14 +122,14 @@ class RouteSpeedService:
 
         metadata = {
             "applied": True,
-            "source": "long_highway_fastest_duration",
+            "source": "long_highway_user_speed",
             "distance_km": round(distance_km, 1),
             "highway_ratio": round(float(highway_ratio), 3),
             "original_duration_minutes": round(duration_minutes, 1),
             "normalized_duration_minutes": normalized_duration,
             "original_average_speed_kmh": round(current_speed, 1),
-            "target_average_speed_kmh": RouteSpeedService.LONG_HIGHWAY_TARGET_SPEED_KMH,
-            "duration_reduction_minutes": round(gain_minutes, 1),
+            "target_average_speed_kmh": target_speed,
+            "duration_delta_minutes": round(duration_delta_minutes, 1),
         }
 
         try:
@@ -143,6 +145,33 @@ class RouteSpeedService:
             pass
 
         return normalized_duration
+
+
+    @staticmethod
+    def _normalize_highway_target_speed(
+        value: float | None,
+    ) -> float:
+        if value is None:
+            return RouteSpeedService.LONG_HIGHWAY_TARGET_SPEED_KMH
+
+        try:
+            speed = float(value)
+        except Exception:
+            return RouteSpeedService.LONG_HIGHWAY_TARGET_SPEED_KMH
+
+        if speed <= 0:
+            return RouteSpeedService.LONG_HIGHWAY_TARGET_SPEED_KMH
+
+        return round(
+            max(
+                75.0,
+                min(
+                    125.0,
+                    speed,
+                ),
+            ),
+            1,
+        )
 
     @staticmethod
     def _speed_from_route(

@@ -3,7 +3,8 @@ import { FormEvent, useState } from "react";
 import type {
   TripConditions,
   TripRequest,
-  WaypointMode
+  WaypointMode,
+  PlanningMode
 } from "../types/trip";
 
 interface TripFormProps {
@@ -56,8 +57,11 @@ export function TripForm({
   const [destination, setDestination] = useState("");
   const [waypoints, setWaypoints] = useState("Kingston, ON\ncornwall, ON");
   const [waypointMode, setWaypointMode] = useState<WaypointMode>("via_points");
+  const [planningMode, setPlanningMode] =
+    useState<PlanningMode>("fastest");
 
   const [startingSoc, setStartingSoc] = useState("100");
+  const [highwaySpeedKmh, setHighwaySpeedKmh] = useState("91");
 
   const [showConditions, setShowConditions] = useState(false);
 
@@ -137,7 +141,9 @@ export function TripForm({
       waypoints: parseWaypoints(waypoints),
       waypoint_mode: waypointMode,
       starting_soc: Number(startingSoc),
-      average_speed: 90,
+      planning_mode: planningMode,
+      average_speed: optionalNumber(highwaySpeedKmh) ?? 90,
+      highway_speed_kmh: optionalNumber(highwaySpeedKmh) ?? 91,
       traffic_mode: "live",
       traffic_level: undefined
     };
@@ -228,6 +234,35 @@ export function TripForm({
               max="100"
               value={startingSoc}
               onChange={(event) => setStartingSoc(event.target.value)}
+              required
+            />
+          </label>
+
+          <label>
+            Planning Mode
+            <select
+              value={planningMode}
+              onChange={(event) =>
+                setPlanningMode(event.target.value as PlanningMode)
+              }
+            >
+              <option value="fastest">
+                Fastest / ABRP style — arrive around 15%
+              </option>
+              <option value="conservative">
+                Conservative — arrive around 25%
+              </option>
+            </select>
+          </label>
+
+          <label>
+            Highway Speed km/h
+            <input
+              type="number"
+              min="75"
+              max="125"
+              value={highwaySpeedKmh}
+              onChange={(event) => setHighwaySpeedKmh(event.target.value)}
               required
             />
           </label>

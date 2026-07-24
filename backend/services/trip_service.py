@@ -629,6 +629,8 @@ class TripService:
         traffic_mode="live",
         traffic_level=None,
         trip_conditions=None,
+        planning_mode="conservative",
+        highway_speed_kmh=None,
         waypoint_mode: str = "required_stops"
     ):
         vehicle = VehicleRegistry.get(vehicle_id)
@@ -648,7 +650,9 @@ class TripService:
                 highway_ratio=highway_ratio,
             traffic_mode=traffic_mode,
             traffic_level=traffic_level,
-            trip_conditions=trip_conditions
+            trip_conditions=trip_conditions,
+                planning_mode=planning_mode,
+                highway_speed_kmh=highway_speed_kmh
             )
 
             planning_result = await TripExpander.expand_with_result(
@@ -704,7 +708,9 @@ class TripService:
             starting_soc=starting_soc,
             average_speed=average_speed,
             highway_ratio=highway_ratio,
-            trip_conditions=trip_conditions
+            trip_conditions=trip_conditions,
+            planning_mode=planning_mode,
+            highway_speed_kmh=highway_speed_kmh
         )
 
         planning_result = await TripExpander.expand_with_result(

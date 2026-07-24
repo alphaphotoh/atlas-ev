@@ -38,6 +38,13 @@ class TripRequest(BaseModel):
 
     highway_ratio: float = 0.8
 
+    planning_mode: Literal[
+        "conservative",
+        "fastest"
+    ] = "conservative"
+
+    highway_speed_kmh: float | None = None
+
     traffic_mode: Literal[
         "none",
         "estimated",
