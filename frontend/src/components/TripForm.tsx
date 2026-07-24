@@ -55,7 +55,7 @@ export function TripForm({
 }: TripFormProps) {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
-  const [waypoints, setWaypoints] = useState("Kingston, ON\ncornwall, ON");
+  const [waypoints, setWaypoints] = useState("");
   const [waypointMode, setWaypointMode] = useState<WaypointMode>("via_points");
   const [planningMode, setPlanningMode] =
     useState<PlanningMode>("fastest");
@@ -142,7 +142,7 @@ export function TripForm({
       waypoint_mode: waypointMode,
       starting_soc: Number(startingSoc),
       planning_mode: planningMode,
-      average_speed: optionalNumber(highwaySpeedKmh) ?? 90,
+      average_speed: 90,
       highway_speed_kmh: optionalNumber(highwaySpeedKmh) ?? 91,
       traffic_mode: "live",
       traffic_level: undefined
@@ -256,7 +256,7 @@ export function TripForm({
           </label>
 
           <label>
-            Highway Speed km/h
+            Highway Cruising Speed km/h
             <input
               type="number"
               min="75"

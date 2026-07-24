@@ -69,83 +69,142 @@ class RouteSpeedService:
 
     @staticmethod
     def apply_long_highway_duration_normalization(
-        route: Any,
-        highway_ratio: float | None,
+        route,
+        highway_ratio,
         target_speed_kmh: float | None = None,
-    ) -> float | None:
-        distance_km = RouteSpeedService._read_float(
+    ):
+        distance_km = getattr(
             route,
-            ["distance_km", "distance"],
+            "distance_km",
+            0.0,
+        ) or 0.0
+
+        original_duration_minutes = getattr(
+            route,
+            "duration_minutes",
+            0.0,
+        ) or 0.0
+
+        if distance_km <= 0 or original_duration_minutes <= 0:
+            return
+
+        try:
+            highway_ratio = float(highway_ratio or 0.0)
+        except Exception:
+            highway_ratio = 0.0
+
+        highway_ratio = max(
+            0.0,
+            min(
+                1.0,
+                highway_ratio,
+            ),
         )
 
-        duration_minutes = RouteSpeedService._read_float(
-            route,
-            ["duration_minutes", "duration"],
+        minimum_distance_km = getattr(
+            RouteSpeedService,
+            "LONG_HIGHWAY_MIN_DISTANCE_KM",
+            300.0,
         )
 
-        if distance_km is None or duration_minutes is None:
-            return None
+        minimum_highway_ratio = getattr(
+            RouteSpeedService,
+            "LONG_HIGHWAY_MIN_HIGHWAY_RATIO",
+            getattr(
+                RouteSpeedService,
+                "LONG_HIGHWAY_MIN_RATIO",
+                0.65,
+            ),
+        )
 
-        if distance_km < RouteSpeedService.LONG_HIGHWAY_MIN_DISTANCE_KM:
-            return None
+        if distance_km < minimum_distance_km:
+            return
 
-        if highway_ratio is None:
-            return None
+        if highway_ratio < minimum_highway_ratio:
+            return
 
-        if float(highway_ratio) < RouteSpeedService.LONG_HIGHWAY_MIN_RATIO:
-            return None
-
-        if duration_minutes <= 0:
-            return None
-
-        target_speed = RouteSpeedService._normalize_highway_target_speed(
+        highway_speed_kmh = RouteSpeedService._normalize_highway_target_speed(
             target_speed_kmh
         )
 
-        current_speed = distance_km / (duration_minutes / 60.0)
-
-        normalized_duration = (
-            distance_km
-            / target_speed
-            * 60.0
+        local_road_speed_kmh = getattr(
+            RouteSpeedService,
+            "LONG_TRIP_LOCAL_ROAD_SPEED_KMH",
+            60.0,
         )
 
-        duration_delta_minutes = duration_minutes - normalized_duration
+        try:
+            local_road_speed_kmh = float(local_road_speed_kmh)
+        except Exception:
+            local_road_speed_kmh = 60.0
 
-        if abs(duration_delta_minutes) < 5.0:
-            return None
+        local_road_speed_kmh = max(
+            35.0,
+            min(
+                80.0,
+                local_road_speed_kmh,
+            ),
+        )
 
-        normalized_duration = round(
-            normalized_duration,
+        highway_distance_km = distance_km * highway_ratio
+        local_distance_km = distance_km - highway_distance_km
+
+        highway_minutes = (
+            highway_distance_km
+            / highway_speed_kmh
+        ) * 60.0
+
+        local_minutes = (
+            local_distance_km
+            / local_road_speed_kmh
+        ) * 60.0
+
+        adjusted_duration_minutes = round(
+            highway_minutes + local_minutes,
             1,
         )
 
-        metadata = {
-            "applied": True,
-            "source": "long_highway_user_speed",
-            "distance_km": round(distance_km, 1),
-            "highway_ratio": round(float(highway_ratio), 3),
-            "original_duration_minutes": round(duration_minutes, 1),
-            "normalized_duration_minutes": normalized_duration,
-            "original_average_speed_kmh": round(current_speed, 1),
-            "target_average_speed_kmh": target_speed,
-            "duration_delta_minutes": round(duration_delta_minutes, 1),
+        if adjusted_duration_minutes <= 0:
+            return
+
+        adjusted_average_speed_kmh = round(
+            distance_km / (adjusted_duration_minutes / 60.0),
+            1,
+        )
+
+        metadata = getattr(
+            route,
+            "metadata",
+            None,
+        )
+
+        if metadata is None or not isinstance(metadata, dict):
+            metadata = {}
+            try:
+                route.metadata = metadata
+            except Exception:
+                pass
+
+        metadata["highway_speed_normalization"] = {
+            "source": "user_highway_speed_only",
+            "highway_speed_kmh": highway_speed_kmh,
+            "local_road_speed_kmh": local_road_speed_kmh,
+            "highway_ratio": round(highway_ratio, 3),
+            "highway_distance_km": round(highway_distance_km, 1),
+            "local_distance_km": round(local_distance_km, 1),
+            "original_duration_minutes": round(
+                original_duration_minutes,
+                1,
+            ),
+            "adjusted_duration_minutes": adjusted_duration_minutes,
+            "adjusted_average_speed_kmh": adjusted_average_speed_kmh,
+            "duration_delta_minutes": round(
+                adjusted_duration_minutes - original_duration_minutes,
+                1,
+            ),
         }
 
-        try:
-            if isinstance(route, dict):
-                route["duration_normalization"] = metadata
-            else:
-                setattr(
-                    route,
-                    "duration_normalization",
-                    metadata,
-                )
-        except Exception:
-            pass
-
-        return normalized_duration
-
+        route.duration_minutes = adjusted_duration_minutes
 
     @staticmethod
     def _normalize_highway_target_speed(
