@@ -235,6 +235,48 @@ class TripBuilder:
         if traffic_impact.applied and traffic_impact.adjusted_duration_minutes:
             route.duration_minutes = traffic_impact.adjusted_duration_minutes
 
+        normalized_duration_minutes = (
+            RouteSpeedService.apply_long_highway_duration_normalization(
+                route=route,
+                highway_ratio=highway_ratio,
+            )
+        )
+
+        if normalized_duration_minutes is not None:
+            route.duration_minutes = normalized_duration_minutes
+
+        effective_speed_estimate = RouteSpeedService.estimate(
+            route=route,
+            fallback_average_speed_kmh=average_speed,
+        )
+
+        average_speed = effective_speed_estimate.average_speed_kmh
+
+        try:
+            setattr(
+                route,
+                "effective_speed_estimate",
+                effective_speed_estimate,
+            )
+        except Exception:
+            pass
+
+        base_predicted_efficiency = EnergyService.predict_efficiency(
+            temperature=weather.temperature_c,
+            average_speed=average_speed,
+            highway_ratio=highway_ratio
+        )
+
+        learned_predicted_efficiency = (
+            base_predicted_efficiency *
+            learning_correction_factor
+        )
+
+        conditions_adjusted_efficiency = (
+            learned_predicted_efficiency +
+            trip_conditions_impact.efficiency_adjustment_kwh_per_100km
+        )
+
         traffic_adjusted_efficiency = (
             conditions_adjusted_efficiency +
             traffic_impact.efficiency_adjustment_kwh_per_100km

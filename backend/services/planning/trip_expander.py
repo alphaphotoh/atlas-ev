@@ -1,3 +1,5 @@
+import copy
+
 from backend.models.trip_itinerary import TripItinerary
 from backend.services.planning.graph_planner import GraphPlanner
 from backend.services.planning.very_long_trip_fallback_planner import (
@@ -18,8 +20,16 @@ class TripExpander:
 
     @staticmethod
     async def expand_with_result(trip):
-        graph_result = await GraphPlanner.plan_with_alternatives(
+        graph_trip = copy.deepcopy(
             trip
+        )
+
+        fallback_trip = copy.deepcopy(
+            trip
+        )
+
+        graph_result = await GraphPlanner.plan_with_alternatives(
+            graph_trip
         )
 
         needs_charging = TripExpander.trip_needs_charging(
@@ -33,7 +43,7 @@ class TripExpander:
             return graph_result
 
         fallback_result = await VeryLongTripFallbackPlanner.plan(
-            trip
+            fallback_trip
         )
 
         graph_usable = TripExpander.result_is_usable(
@@ -273,7 +283,6 @@ class TripExpander:
             return second_result
 
         return first_result
-
     @staticmethod
     def result_total_minutes(
         result,
