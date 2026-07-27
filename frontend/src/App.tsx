@@ -111,6 +111,138 @@ function availabilityClass(status: string | null) {
   return "unknown";
 }
 
+
+function formatTimelineChargerPower(stop: unknown): string {
+  const powerKw = firstNumber(stop, [
+    "power_kw",
+    "max_power_kw",
+    "charger_power_kw",
+    "maximum_power_kw",
+    "dc_power_kw",
+  ]);
+
+  if (powerKw === null || powerKw <= 0) {
+    return "Power unknown";
+  }
+
+  return `${Math.round(powerKw)} kW`;
+}
+
+function formatTimelineNetwork(stop: unknown): string {
+  return (
+    firstString(stop, [
+      "network",
+      "operator",
+      "operator_name",
+      "provider",
+    ]) ?? "Network unknown"
+  );
+}
+
+function formatTimelineAvailability(stop: unknown): string {
+  const status =
+    firstString(stop, [
+      "availability_status",
+      "availability",
+      "status",
+    ]) ?? "unknown";
+
+  switch (status.toLowerCase()) {
+    case "available":
+      return "Available";
+    case "limited":
+      return "Limited";
+    case "busy":
+      return "Busy";
+    case "offline":
+      return "Offline";
+    case "unknown":
+      return "Availability unknown";
+    default:
+      return status;
+  }
+}
+
+function formatTimelineReliability(stop: unknown): string {
+  const label =
+    firstString(stop, [
+      "reliability_label",
+      "reliability",
+    ]) ?? null;
+
+  const score = firstNumber(stop, [
+    "reliability_score",
+    "reliabilityScore",
+  ]);
+
+  if (label && score !== null) {
+    const percent = score <= 1 ? score * 100 : score;
+
+    return `${label} · ${Math.round(percent)}%`;
+  }
+
+  if (label) {
+    return label;
+  }
+
+  if (score !== null) {
+    const percent = score <= 1 ? score * 100 : score;
+
+    return `${Math.round(percent)}% reliability`;
+  }
+
+  return "Reliability unknown";
+}
+
+function formatTimelineQuality(stop: unknown): string {
+  const network = formatTimelineNetwork(stop).toLowerCase();
+  const powerKw = firstNumber(stop, [
+    "power_kw",
+    "max_power_kw",
+    "charger_power_kw",
+    "maximum_power_kw",
+    "dc_power_kw",
+  ]);
+
+  if (
+    network.includes("electrify") ||
+    network.includes("tesla") ||
+    network.includes("chargepoint") ||
+    network.includes("evgo") ||
+    network.includes("flo") ||
+    network.includes("petro-canada") ||
+    network.includes("ivy")
+  ) {
+    if (powerKw !== null && powerKw >= 150) {
+      return "Trusted high-power stop";
+    }
+
+    return "Trusted network";
+  }
+
+  if (
+    network.includes("unknown") ||
+    network.includes("(unknown operator)")
+  ) {
+    if (powerKw !== null && powerKw >= 150) {
+      return "High power · unknown operator";
+    }
+
+    return "Unknown operator";
+  }
+
+  if (powerKw !== null && powerKw >= 150) {
+    return "High-power stop";
+  }
+
+  if (powerKw !== null && powerKw > 0) {
+    return "Standard DC stop";
+  }
+
+  return "Quality unknown";
+}
+
+
 function getFinalSoc(summary: unknown): number | null {
   return firstNumber(summary, [
     "final_arrival_soc",
@@ -379,6 +511,33 @@ function CompactChargingTimeline({
                   {" · "}
                   {formatPercent(arriveSoc)} → {formatPercent(leaveSoc)}
                 </span>
+
+                <div className="tesla-route-quality-grid">
+                  <span>
+                    <small>Power</small>
+                    <strong>{formatTimelineChargerPower(stop)}</strong>
+                  </span>
+
+                  <span>
+                    <small>Network</small>
+                    <strong>{formatTimelineNetwork(stop)}</strong>
+                  </span>
+
+                  <span>
+                    <small>Reliability</small>
+                    <strong>{formatTimelineReliability(stop)}</strong>
+                  </span>
+
+                  <span>
+                    <small>Quality</small>
+                    <strong>{formatTimelineQuality(stop)}</strong>
+                  </span>
+
+                  <span>
+                    <small>Availability</small>
+                    <strong>{formatTimelineAvailability(stop)}</strong>
+                  </span>
+                </div>
 
                 <div className="tesla-route-mini-metrics">
                   <small>

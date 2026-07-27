@@ -2,27 +2,35 @@ from backend.core.http_client import HttpClient
 
 
 class ElevationService:
+    API_URL = "https://api.open-meteo.com/v1/elevation"
 
     @staticmethod
     async def get_elevation(
         latitude,
-        longitude
+        longitude,
     ):
+        try:
+            response = await HttpClient.get(
+                ElevationService.API_URL,
+                params={
+                    "latitude": latitude,
+                    "longitude": longitude,
+                },
+            )
 
-        response = await HttpClient.get(
+            data = response.json()
 
-            "https://api.open-meteo.com/v1/elevation",
+            elevation_values = data.get(
+                "elevation",
+                [],
+            )
 
-            params={
+            if not elevation_values:
+                return 0.0
 
-                "latitude": latitude,
+            return float(
+                elevation_values[0]
+            )
 
-                "longitude": longitude
-
-            }
-
-        )
-
-        data = response.json()
-
-        return data["elevation"][0]
+        except Exception:
+            return 0.0

@@ -90,7 +90,7 @@ class DepartureOptimizer:
     @staticmethod
     def fast_departure_soc_options(
         trip,
-        arrival_soc
+        arrival_soc,
     ):
         planning = getattr(
             trip,
@@ -104,11 +104,49 @@ class DepartureOptimizer:
             except Exception:
                 return float(default)
 
+        def unique_sorted(values):
+            result = []
+
+            for value in values:
+                try:
+                    normalized = round(float(value), 1)
+                except Exception:
+                    continue
+
+                if normalized not in result:
+                    result.append(normalized)
+
+            return sorted(result)
+
+        def limit_evenly(values, max_count):
+            values = unique_sorted(values)
+
+            if len(values) <= max_count:
+                return values
+
+            selected = [values[0]]
+            last_index = len(values) - 1
+
+            for slot in range(1, max_count - 1):
+                index = round(
+                    (last_index * slot)
+                    / (max_count - 1)
+                )
+                selected.append(values[index])
+
+            selected.append(values[-1])
+
+            return unique_sorted(selected)
+
         target_destination_soc = safe_float(
             getattr(
                 planning,
                 "target_destination_soc",
-                25.0,
+                getattr(
+                    planning,
+                    "destination_target_soc",
+                    25.0,
+                ),
             ),
             25.0,
         )
@@ -134,116 +172,130 @@ class DepartureOptimizer:
             None,
         )
 
-        route_distance_km = getattr(
-            route,
-            "distance_km",
+        route_distance_km = safe_float(
+            getattr(
+                route,
+                "distance_km",
+                0.0,
+            ) or 0.0,
             0.0,
-        ) or 0.0
+        )
 
         arrival_soc = safe_float(
             arrival_soc,
             0.0,
         )
 
-        minimum_departure = max(
-            arrival_soc + 8.0,
-            target_destination_soc + 10.0,
+        arrival_soc = max(
+            0.0,
+            min(
+                100.0,
+                arrival_soc,
+            ),
         )
 
         if is_fastest:
-            charge_limit_soc = safe_float(
-                getattr(
-                    planning,
-                    "road_trip_charge_limit",
-                    85.0,
-                ),
+            safety_buffer_soc = 8.0
+            destination_buffer_soc = 5.0
+            default_charge_limit_soc = 85.0
+            max_option_count = 10
+        else:
+            safety_buffer_soc = 10.0
+            destination_buffer_soc = 10.0
+            default_charge_limit_soc = 100.0
+            max_option_count = 8
+
+        minimum_departure_soc = max(
+            arrival_soc + safety_buffer_soc,
+            target_destination_soc + destination_buffer_soc,
+        )
+
+        requested_charge_limit_soc = safe_float(
+            getattr(
+                planning,
+                "road_trip_charge_limit",
+                default_charge_limit_soc,
+            ),
+            default_charge_limit_soc,
+        )
+
+        if is_fastest:
+            soft_charge_cap_soc = min(
+                requested_charge_limit_soc,
                 85.0,
             )
-
-            charge_limit_soc = max(
-                minimum_departure,
-                min(
-                    85.0,
-                    charge_limit_soc,
-                ),
-            )
-
-            if route_distance_km >= 300:
-                raw_options = [
-                    max(minimum_departure, 55.0),
-                    max(minimum_departure, 65.0),
-                    max(minimum_departure, 75.0),
-                    charge_limit_soc,
-                ]
-            else:
-                raw_options = [
-                    minimum_departure,
-                    max(minimum_departure, 55.0),
-                    max(minimum_departure, 65.0),
-                    min(charge_limit_soc, 75.0),
-                ]
         else:
-            charge_limit_soc = safe_float(
-                getattr(
-                    planning,
-                    "road_trip_charge_limit",
-                    100.0,
-                ),
+            soft_charge_cap_soc = min(
+                requested_charge_limit_soc,
                 100.0,
             )
 
-            charge_limit_soc = max(
-                minimum_departure,
-                min(
-                    100.0,
-                    charge_limit_soc,
-                ),
+        soft_charge_cap_soc = max(
+            minimum_departure_soc,
+            soft_charge_cap_soc,
+        )
+
+        soft_charge_cap_soc = min(
+            100.0,
+            soft_charge_cap_soc,
+        )
+
+        if route_distance_km >= 650:
+            step_soc = 5.0
+        elif route_distance_km >= 300:
+            step_soc = 4.0
+        else:
+            step_soc = 3.0
+
+        options = [
+            minimum_departure_soc,
+            soft_charge_cap_soc,
+        ]
+
+        current_soc = minimum_departure_soc
+
+        while current_soc <= soft_charge_cap_soc:
+            options.append(current_soc)
+            current_soc += step_soc
+
+        options.append(
+            min(
+                100.0,
+                minimum_departure_soc + step_soc,
             )
+        )
 
-            if route_distance_km >= 650:
-                raw_options = [
-                    85.0,
-                    95.0,
-                    100.0,
-                ]
-            elif route_distance_km >= 300:
-                raw_options = [
-                    minimum_departure,
-                    85.0,
-                    100.0,
-                ]
-            else:
-                raw_options = [
-                    minimum_departure,
-                    75.0,
-                    95.0,
-                ]
+        options.append(
+            min(
+                100.0,
+                minimum_departure_soc + (step_soc * 2),
+            )
+        )
 
-        options = []
+        clean_options = []
 
-        for value in raw_options:
-            value = round(
+        for option in options:
+            option = round(
                 max(
                     arrival_soc,
                     min(
                         100.0,
-                        charge_limit_soc,
-                        float(value),
+                        soft_charge_cap_soc,
+                        float(option),
                     ),
                 ),
                 1,
             )
 
-            if value <= arrival_soc:
+            if option <= arrival_soc:
                 continue
 
-            if value not in options:
-                options.append(value)
+            clean_options.append(option)
 
-        if is_fastest:
-            return options[:4]
-
-        return options[:3]
+        return limit_evenly(
+            clean_options,
+            max_option_count,
+        )
 
     @staticmethod
     async def non_final_options(

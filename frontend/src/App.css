@@ -2151,3 +2151,32 @@ select:focus {
   background: #f1f2f4;
   color: #393c41;
 }
+
+.tesla-route-quality-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.tesla-route-quality-grid span {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 0.85rem;
+  padding: 0.6rem 0.7rem;
+  background: rgba(15, 23, 42, 0.32);
+}
+
+.tesla-route-quality-grid small {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: rgba(226, 232, 240, 0.68);
+  font-size: 0.74rem;
+}
+
+.tesla-route-quality-grid strong {
+  display: block;
+  color: rgba(248, 250, 252, 0.94);
+  font-size: 0.86rem;
+  line-height: 1.25;
+}
+
