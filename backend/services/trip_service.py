@@ -582,6 +582,30 @@ class TripService:
 
     @staticmethod
     def add_soc_strategy_to_stop(stop):
+        existing_strategy = stop.get(
+            "soc_strategy"
+        )
+
+        if isinstance(
+            existing_strategy,
+            dict,
+        ):
+            strategy_label = existing_strategy.get(
+                "strategy"
+            )
+
+            strategy_reason = existing_strategy.get(
+                "reason"
+            )
+
+            if strategy_label:
+                stop["soc_strategy_label"] = strategy_label
+
+            if strategy_reason:
+                stop["soc_strategy_reason"] = strategy_reason
+
+            return stop
+
         def safe_float(value, default=0.0):
             try:
                 return float(value)
@@ -701,6 +725,7 @@ class TripService:
         )
 
         stop["soc_strategy"] = {
+            "source": "backend_trip_service",
             "strategy": strategy_name,
             "reason": reason,
             "arrival_soc": round(
@@ -1946,6 +1971,21 @@ class TripService:
                     "score": TripService.round_value(
                         candidate.score,
                         2
+                    ),
+                    "soc_strategy": getattr(
+                        candidate,
+                        "soc_strategy",
+                        None,
+                    ),
+                    "soc_strategy_label": getattr(
+                        candidate,
+                        "soc_strategy_label",
+                        None,
+                    ),
+                    "soc_strategy_reason": getattr(
+                        candidate,
+                        "soc_strategy_reason",
+                        None,
                     ),
                     "reliability_score": reliability.get(
                         "reliability_score"

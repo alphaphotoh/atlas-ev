@@ -706,6 +706,129 @@ class VeryLongTripFallbackPlanner:
         candidate.destination_soc_if_no_more_charging = round(destination_soc, 1)
         candidate.requires_additional_stop = destination_soc < target_soc
         candidate.destination_reachable_from_charger = destination_soc >= target_soc
+
+        common_targets = [
+            50.0,
+            55.0,
+            60.0,
+            65.0,
+            70.0,
+            75.0,
+            80.0,
+            85.0,
+            90.0,
+            95.0,
+            98.0,
+            100.0,
+        ]
+
+        fallback_bands = [
+            60.0,
+            65.0,
+            70.0,
+            75.0,
+            80.0,
+            85.0,
+            90.0,
+            95.0,
+            98.0,
+            100.0,
+        ]
+
+        nearest_common_target = min(
+            common_targets,
+            key=lambda value: abs(
+                value - departure_soc
+            ),
+        )
+
+        is_common_target = (
+            abs(
+                nearest_common_target
+                - departure_soc
+            )
+            <= 0.2
+        )
+
+        if departure_soc >= 99.5:
+            soc_strategy_label = "Required full charge"
+            soc_strategy_reason = (
+                "Atlas selected a near-full charge because the fallback planner "
+                "needed it for route reachability."
+            )
+        elif departure_soc >= 85.0:
+            soc_strategy_label = "Upper curve target"
+            soc_strategy_reason = (
+                "Atlas selected a high SOC target because the downstream route "
+                "needed more energy."
+            )
+        elif is_common_target:
+            soc_strategy_label = "Planner target band"
+            soc_strategy_reason = (
+                "Atlas selected this SOC target band after checking reachability, "
+                "charging time, and downstream route needs."
+            )
+        else:
+            soc_strategy_label = "Computed route target"
+            soc_strategy_reason = (
+                "Atlas calculated this route-specific SOC target instead of using "
+                "a fixed band."
+            )
+
+        minimum_candidate_soc = max(
+            arrival_soc + 8.0,
+            35.0,
+        )
+
+        if arrival_soc < VeryLongTripFallbackPlanner.PREFERRED_MIN_ARRIVAL_SOC:
+            minimum_candidate_soc = max(
+                minimum_candidate_soc,
+                arrival_soc + 30.0,
+                35.0,
+            )
+
+        backend_targets = []
+
+        for band in fallback_bands:
+            target = round(
+                max(
+                    minimum_candidate_soc,
+                    band,
+                ),
+                1,
+            )
+
+            if target <= 100.0 and target not in backend_targets:
+                backend_targets.append(target)
+
+        selected_target = round(
+            departure_soc,
+            1,
+        )
+
+        if selected_target not in backend_targets:
+            backend_targets.append(selected_target)
+
+        backend_targets = sorted(
+            backend_targets
+        )
+
+        candidate.soc_strategy = {
+            "source": "backend_fallback",
+            "strategy": soc_strategy_label,
+            "reason": soc_strategy_reason,
+            "selected_target_soc": selected_target,
+            "candidate_targets": backend_targets,
+            "soft_cap_soc": 85.0,
+            "nearest_common_target": round(
+                nearest_common_target,
+                1,
+            ),
+            "is_common_target": is_common_target,
+        }
+
+        candidate.soc_strategy_label = soc_strategy_label
+        candidate.soc_strategy_reason = soc_strategy_reason
         candidate.total_trip_time_minutes = round(
             next_trip.route.duration_minutes
             + charging_minutes

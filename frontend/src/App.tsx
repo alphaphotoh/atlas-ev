@@ -129,6 +129,22 @@ function getTimelineSocStrategy(stop: unknown): Record<string, unknown> {
   return strategy as Record<string, unknown>;
 }
 
+
+function hasTimelineActualSocStrategy(stop: unknown): boolean {
+  const strategy = getTimelineSocStrategy(stop);
+
+  const source = firstString(strategy, [
+    "source",
+  ]);
+
+  const targets = strategy.candidate_targets;
+
+  return (
+    source === "backend_optimizer" || source === "backend_fallback" || source === "backend_trip_service" ||
+    (Array.isArray(targets) && targets.length > 0)
+  );
+}
+
 function formatTimelineSocStrategyLabel(stop: unknown): string {
   const strategy = getTimelineSocStrategy(stop);
 
@@ -850,7 +866,10 @@ function CompactChargingTimeline({
                   <strong>{formatTimelineSocStrategyLabel(stop)}</strong>
                   <span>{formatTimelineSocStrategyReason(stop)}</span>
                   <small>
-                    Estimated candidate targets: {formatTimelineSocCandidates(stop)}
+                    {hasTimelineActualSocStrategy(stop)
+                      ? "Backend SOC targets"
+                      : "Backend-derived SOC targets"}
+                    : {formatTimelineSocCandidates(stop)}
                   </small>
                 </div>
 

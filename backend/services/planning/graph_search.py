@@ -233,6 +233,25 @@ class GraphSearch:
                 f"{len(charge_options)}"
             )
 
+            tested_soc_targets = []
+
+            for option_departure_soc, _option_trip in charge_options:
+                try:
+                    tested_soc_targets.append(
+                        round(
+                            float(option_departure_soc),
+                            1,
+                        )
+                    )
+                except Exception:
+                    continue
+
+            tested_soc_targets = sorted(
+                set(
+                    tested_soc_targets
+                )
+            )
+
             for departure_soc, next_trip in charge_options:
                 if next_trip is None:
                     continue
@@ -240,6 +259,86 @@ class GraphSearch:
                 option_candidate = copy.deepcopy(candidate)
 
                 option_candidate.departure_soc = departure_soc
+                try:
+                    selected_departure_soc = round(
+                        float(departure_soc),
+                        1,
+                    )
+                except Exception:
+                    selected_departure_soc = 0.0
+
+                common_targets = [
+                    50.0,
+                    55.0,
+                    60.0,
+                    65.0,
+                    70.0,
+                    75.0,
+                    80.0,
+                    85.0,
+                    90.0,
+                    95.0,
+                    98.0,
+                    100.0,
+                ]
+
+                nearest_common_target = min(
+                    common_targets,
+                    key=lambda value: abs(
+                        value - selected_departure_soc
+                    ),
+                )
+
+                is_common_target = (
+                    abs(
+                        nearest_common_target
+                        - selected_departure_soc
+                    )
+                    <= 0.2
+                )
+
+                if selected_departure_soc >= 99.5:
+                    soc_strategy_label = "Required full charge"
+                    soc_strategy_reason = (
+                        "Atlas tested feasible SOC targets and selected a near-full charge "
+                        "because the route required it for reachability."
+                    )
+                elif selected_departure_soc >= 85.0:
+                    soc_strategy_label = "Upper curve target"
+                    soc_strategy_reason = (
+                        "Atlas tested feasible SOC targets and selected a high target "
+                        "because the downstream route needed more energy."
+                    )
+                elif is_common_target:
+                    soc_strategy_label = "Planner target band"
+                    soc_strategy_reason = (
+                        "Atlas tested feasible SOC targets and selected this target band "
+                        "after considering charging time, reachability, and downstream route needs."
+                    )
+                else:
+                    soc_strategy_label = "Computed route target"
+                    soc_strategy_reason = (
+                        "Atlas tested feasible SOC targets and selected a route-specific "
+                        "SOC target instead of a fixed band."
+                    )
+
+                option_candidate.soc_strategy = {
+                    "source": "backend_optimizer",
+                    "strategy": soc_strategy_label,
+                    "reason": soc_strategy_reason,
+                    "selected_target_soc": selected_departure_soc,
+                    "candidate_targets": tested_soc_targets,
+                    "soft_cap_soc": 85.0,
+                    "nearest_common_target": round(
+                        nearest_common_target,
+                        1,
+                    ),
+                    "is_common_target": is_common_target,
+                }
+
+                option_candidate.soc_strategy_label = soc_strategy_label
+                option_candidate.soc_strategy_reason = soc_strategy_reason
+
 
                 option_candidate.destination_arrival_soc = (
                     GraphSearch.trip_arrival_soc(next_trip)
