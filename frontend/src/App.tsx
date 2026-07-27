@@ -112,6 +112,303 @@ function availabilityClass(status: string | null) {
 }
 
 
+
+function getTimelineSocStrategy(stop: unknown): Record<string, unknown> {
+  if (!stop || typeof stop !== "object") {
+    return {};
+  }
+
+  const record = stop as Record<string, unknown>;
+
+  const strategy = record.soc_strategy ?? record.socStrategy;
+
+  if (!strategy || typeof strategy !== "object") {
+    return {};
+  }
+
+  return strategy as Record<string, unknown>;
+}
+
+function formatTimelineSocStrategyLabel(stop: unknown): string {
+  const strategy = getTimelineSocStrategy(stop);
+
+  const explicitLabel =
+    firstString(strategy, [
+      "strategy",
+      "label",
+      "name",
+    ]) ??
+    firstString(stop, [
+      "soc_strategy_label",
+      "socStrategyLabel",
+    ]);
+
+  if (explicitLabel) {
+    return explicitLabel;
+  }
+
+  const selectedTarget =
+    firstNumber(strategy, [
+      "selected_target_soc",
+      "selectedTargetSoc",
+      "target_soc",
+    ]) ??
+    firstNumber(stop, [
+      "departure_soc",
+      "target_soc",
+    ]);
+
+  if (selectedTarget === null) {
+    return "SOC strategy inferred";
+  }
+
+  const commonTargets = [
+    50,
+    55,
+    60,
+    65,
+    70,
+    75,
+    80,
+    85,
+    90,
+    95,
+    98,
+    100,
+  ];
+
+  const nearestCommonTarget = commonTargets.reduce((best, value) =>
+    Math.abs(value - selectedTarget) < Math.abs(best - selectedTarget)
+      ? value
+      : best
+  );
+
+  if (selectedTarget >= 99.5) {
+    return "Required full charge";
+  }
+
+  if (selectedTarget >= 85) {
+    return "Upper curve target";
+  }
+
+  if (Math.abs(nearestCommonTarget - selectedTarget) <= 0.2) {
+    return "Planner target band";
+  }
+
+  return "Computed route target";
+}
+
+
+
+function formatTimelineSocStrategyReason(stop: unknown): string {
+  const strategy = getTimelineSocStrategy(stop);
+
+  const explicitReason =
+    firstString(strategy, [
+      "reason",
+      "summary",
+    ]) ??
+    firstString(stop, [
+      "soc_strategy_reason",
+      "socStrategyReason",
+    ]);
+
+  if (explicitReason) {
+    return explicitReason;
+  }
+
+  const arrivalSoc = firstNumber(stop, [
+    "arrival_soc",
+  ]);
+
+  const selectedTarget =
+    firstNumber(strategy, [
+      "selected_target_soc",
+      "selectedTargetSoc",
+      "target_soc",
+    ]) ??
+    firstNumber(stop, [
+      "departure_soc",
+      "target_soc",
+    ]);
+
+  if (selectedTarget === null) {
+    return "Atlas selected this departure SOC from the feasible route plan.";
+  }
+
+  const commonTargets = [
+    50,
+    55,
+    60,
+    65,
+    70,
+    75,
+    80,
+    85,
+    90,
+    95,
+    98,
+    100,
+  ];
+
+  const nearestCommonTarget = commonTargets.reduce((best, value) =>
+    Math.abs(value - selectedTarget) < Math.abs(best - selectedTarget)
+      ? value
+      : best
+  );
+
+  const isCommonTarget =
+    Math.abs(nearestCommonTarget - selectedTarget) <= 0.2;
+
+  if (selectedTarget >= 99.5) {
+    return "The route required a near-full charge to preserve reachability.";
+  }
+
+  if (selectedTarget >= 85) {
+    return "Atlas selected a high SOC target because the downstream route needed more energy.";
+  }
+
+  if (isCommonTarget) {
+    return "Atlas selected this feasible target band after considering charging time, reachability, and downstream route needs.";
+  }
+
+  if (arrivalSoc !== null) {
+    return `Atlas calculated this route-specific target from ${arrivalSoc.toFixed(
+      1
+    )}% arrival SOC and downstream energy needs.`;
+  }
+
+  return "Atlas calculated this route-specific SOC target from the selected charging plan.";
+}
+
+
+
+function formatTimelineSocTarget(stop: unknown): string {
+  const strategy = getTimelineSocStrategy(stop);
+
+  const selectedTarget =
+    firstNumber(strategy, [
+      "selected_target_soc",
+      "selectedTargetSoc",
+      "target_soc",
+    ]) ??
+    firstNumber(stop, [
+      "departure_soc",
+      "target_soc",
+    ]);
+
+  if (selectedTarget === null) {
+    return "Target unknown";
+  }
+
+  return `${selectedTarget.toFixed(1)}%`;
+}
+
+function formatTimelineSocAdded(stop: unknown): string {
+  const strategy = getTimelineSocStrategy(stop);
+
+  const socAdded =
+    firstNumber(strategy, [
+      "soc_added",
+      "socAdded",
+    ]) ??
+    firstNumber(stop, [
+      "soc_added",
+    ]);
+
+  if (socAdded === null) {
+    return "SOC added unknown";
+  }
+
+  return `+${socAdded.toFixed(1)}%`;
+}
+
+function formatTimelineSocCandidates(stop: unknown): string {
+  const strategy = getTimelineSocStrategy(stop);
+
+  const values = strategy.candidate_targets;
+
+  if (Array.isArray(values) && values.length > 0) {
+    const formatted = values
+      .map((value) => {
+        const numericValue = Number(value);
+
+        if (!Number.isFinite(numericValue)) {
+          return null;
+        }
+
+        return `${numericValue.toFixed(1)}%`;
+      })
+      .filter(Boolean);
+
+    if (formatted.length > 0) {
+      if (formatted.length > 8) {
+        return `${formatted.slice(0, 8).join(", ")}...`;
+      }
+
+      return formatted.join(", ");
+    }
+  }
+
+  const arrivalSoc = firstNumber(stop, [
+    "arrival_soc",
+  ]);
+
+  const selectedTarget =
+    firstNumber(strategy, [
+      "selected_target_soc",
+      "selectedTargetSoc",
+      "target_soc",
+    ]) ??
+    firstNumber(stop, [
+      "departure_soc",
+      "target_soc",
+    ]);
+
+  if (selectedTarget === null) {
+    return "Estimated targets unavailable";
+  }
+
+  const minimumTarget = Math.max(
+    (arrivalSoc ?? 0) + 8,
+    35
+  );
+
+  const softCap = 85;
+  const estimatedTargets: number[] = [];
+
+  let currentTarget = minimumTarget;
+
+  while (currentTarget <= softCap) {
+    estimatedTargets.push(
+      Number(currentTarget.toFixed(1))
+    );
+
+    currentTarget += 5;
+  }
+
+  estimatedTargets.push(
+    Number(selectedTarget.toFixed(1))
+  );
+
+  const uniqueTargets = Array.from(
+    new Set(estimatedTargets)
+  ).sort((first, second) => first - second);
+
+  const formatted = uniqueTargets.map(
+    (value) => `${value.toFixed(1)}%`
+  );
+
+  if (formatted.length > 8) {
+    return `${formatted.slice(0, 8).join(", ")}...`;
+  }
+
+  return formatted.join(", ");
+}
+
+
+
+
 function formatTimelineChargerPower(stop: unknown): string {
   const powerKw = firstNumber(stop, [
     "power_kw",
@@ -537,6 +834,24 @@ function CompactChargingTimeline({
                     <small>Availability</small>
                     <strong>{formatTimelineAvailability(stop)}</strong>
                   </span>
+
+                  <span>
+                    <small>SOC target</small>
+                    <strong>{formatTimelineSocTarget(stop)}</strong>
+                  </span>
+
+                  <span>
+                    <small>SOC added</small>
+                    <strong>{formatTimelineSocAdded(stop)}</strong>
+                  </span>
+                </div>
+
+                <div className="tesla-route-soc-strategy">
+                  <strong>{formatTimelineSocStrategyLabel(stop)}</strong>
+                  <span>{formatTimelineSocStrategyReason(stop)}</span>
+                  <small>
+                    Estimated candidate targets: {formatTimelineSocCandidates(stop)}
+                  </small>
                 </div>
 
                 <div className="tesla-route-mini-metrics">

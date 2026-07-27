@@ -579,9 +579,173 @@ class TripService:
 
         return warnings
 
+
+    @staticmethod
+    def add_soc_strategy_to_stop(stop):
+        def safe_float(value, default=0.0):
+            try:
+                return float(value)
+            except Exception:
+                return float(default)
+
+        arrival_soc = safe_float(
+            stop.get(
+                "arrival_soc",
+                0.0,
+            )
+        )
+
+        departure_soc = safe_float(
+            stop.get(
+                "departure_soc",
+                0.0,
+            )
+        )
+
+        soc_added = max(
+            0.0,
+            departure_soc - arrival_soc,
+        )
+
+        charging_minutes = safe_float(
+            stop.get(
+                "charging_minutes",
+                0.0,
+            )
+        )
+
+        charge_added_kwh = safe_float(
+            stop.get(
+                "charge_added_kwh",
+                0.0,
+            )
+        )
+
+        common_targets = [
+            50.0,
+            55.0,
+            60.0,
+            65.0,
+            70.0,
+            75.0,
+            80.0,
+            85.0,
+            90.0,
+            95.0,
+            98.0,
+            100.0,
+        ]
+
+        nearest_common_target = min(
+            common_targets,
+            key=lambda value: abs(value - departure_soc),
+        )
+
+        is_common_target = abs(
+            nearest_common_target - departure_soc
+        ) <= 0.15
+
+        if departure_soc >= 99.5:
+            strategy_name = "Required full charge"
+            reason = "The route required a near-full charge to preserve reachability."
+        elif departure_soc >= 85.0:
+            strategy_name = "Upper curve target"
+            reason = "The planner selected a high SOC target because the downstream route needed more energy."
+        elif is_common_target:
+            strategy_name = "Planner target band"
+            reason = "The planner selected this SOC from feasible charging targets and route constraints."
+        else:
+            strategy_name = "Computed route target"
+            reason = "The planner calculated a route-specific SOC target instead of using a fixed band."
+
+        if charging_minutes > 0 and soc_added > 0:
+            minutes_per_soc = charging_minutes / soc_added
+        else:
+            minutes_per_soc = 0.0
+
+        minimum_candidate_soc = round(
+            max(
+                arrival_soc + 8.0,
+                35.0,
+            ),
+            1,
+        )
+
+        soft_cap_soc = 85.0
+
+        candidate_targets = []
+
+        current_soc = minimum_candidate_soc
+
+        while current_soc <= soft_cap_soc:
+            candidate_targets.append(
+                round(
+                    current_soc,
+                    1,
+                )
+            )
+            current_soc += 5.0
+
+        if departure_soc not in candidate_targets:
+            candidate_targets.append(
+                round(
+                    departure_soc,
+                    1,
+                )
+            )
+
+        candidate_targets = sorted(
+            set(
+                candidate_targets
+            )
+        )
+
+        stop["soc_strategy"] = {
+            "strategy": strategy_name,
+            "reason": reason,
+            "arrival_soc": round(
+                arrival_soc,
+                1,
+            ),
+            "selected_target_soc": round(
+                departure_soc,
+                1,
+            ),
+            "soc_added": round(
+                soc_added,
+                1,
+            ),
+            "charge_added_kwh": round(
+                charge_added_kwh,
+                1,
+            ),
+            "charging_minutes": round(
+                charging_minutes,
+                1,
+            ),
+            "minutes_per_soc": round(
+                minutes_per_soc,
+                2,
+            ),
+            "soft_cap_soc": soft_cap_soc,
+            "nearest_common_target": round(
+                nearest_common_target,
+                1,
+            ),
+            "is_common_target": is_common_target,
+            "candidate_targets": candidate_targets,
+        }
+
+        stop["soc_strategy_label"] = strategy_name
+        stop["soc_strategy_reason"] = reason
+
+        return stop
+
+
     @staticmethod
     def add_charging_stop_safety_notes(charging_stops):
         for stop in charging_stops or []:
+            TripService.add_soc_strategy_to_stop(stop)
             arrival_soc = stop.get(
                 "arrival_soc"
             )
